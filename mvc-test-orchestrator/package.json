@@ -1,0 +1,63 @@
+{
+  "name": "mvc-test-orchestrator",
+  "displayName": "MVC Test Orchestrator",
+  "description": "LLM-powered MVC architecture extractor and scaffolder.",
+  "version": "0.0.1",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+
+  "activationEvents": [
+    "onCommand:mvc-test-orchestrator.extractArchitectureFromSRS",
+    "onCommand:mvc-test-orchestrator.generateScaffold",
+    "onView:mvcArchitectureView"
+  ],
+
+  "main": "./out/extension.js",
+
+  "contributes": {
+    "commands": [
+      {
+        "command": "mvc-test-orchestrator.extractArchitectureFromSRS",
+        "title": "MVC: Extract MVC Architecture From SRS",
+        "category": "MVC Orchestrator"
+      },
+      {
+        "command": "mvc-test-orchestrator.generateScaffold",
+        "title": "MVC: Generate Scaffold",
+        "category": "MVC Orchestrator"
+      }
+    ],
+
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mvcArchitectureContainer",
+          "title": "MVC",
+          "icon": "resources/mvc-icon.svg"
+        }
+      ]
+    },
+
+    "views": {
+      "mvcArchitectureContainer": [
+        {
+          "id": "mvcArchitectureView",
+          "name": "📦 MVC Architecture"
+        }
+      ]
+    }
+  },
+
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+
+  "devDependencies": {
+    "@types/vscode": "^1.106.1",
+    "typescript": "^5.9.3"
+  }
+}

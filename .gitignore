@@ -1,0 +1,50 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# OS garbage
+.DS_Store
+Thumbs.db
+
+# VSCode project settings (optional)
+.vscode/
+
+# Environment variables
+.env
+
+# Data outputs
+data/*.json
+data/*.txt
+data/*.pdf
+
+# PDF test files
+*.pdf
+
+# Streamlit cache
+.streamlit/
+
+# Scaffolder output (auto-generated skeleton code)
+scaffolds/
+
+# Logs
+*.log
+
+# Bytecode
+__pycache__/
+*.pyc
+
+# VSCode extension build outputs
+node_modules/
+out/
+
+# VSCode test environment
+.vscode-test/
+
+# Bundled dependencies
+*.vsix

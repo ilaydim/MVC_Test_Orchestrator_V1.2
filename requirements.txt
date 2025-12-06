@@ -1,0 +1,24 @@
+# RAG Core
+chromadb==0.4.22
+sentence-transformers==2.5.1
+
+# PDF / Text Processing
+pdfplumber
+pypdfium2 # Recommended for robust PDF handling
+
+# LLM / Configuration
+google-generativeai
+python-dotenv
+
+# UI
+streamlit
+
+# Structured Output / Agent Communication
+dataclasses-json
+orjson
+
+
+# Optional
+#tqdm ->Progress bars
+#langchain==0.2.10
+#langchain-community==0.2.10
