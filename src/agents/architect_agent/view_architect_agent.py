@@ -2,6 +2,7 @@
 
 from typing import List, Dict, Any
 from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent
+from src.core.config import DEFAULT_TOP_K
 
 
 class ViewArchitectAgent(BaseArchitectAgent):
@@ -20,7 +21,7 @@ class ViewArchitectAgent(BaseArchitectAgent):
     # ----------------------------------------------------------------------
     # Main Entry Point
     # ----------------------------------------------------------------------
-    def extract_views(self, k: int = 6) -> Dict[str, Any]:
+    def extract_views(self, k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
         """
         Extracts VIEW-layer architecture:
         screens, components, navigation, and UI behavior.
@@ -47,9 +48,6 @@ class ViewArchitectAgent(BaseArchitectAgent):
 
         return view_json
 
-    # ----------------------------------------------------------------------
-    # Prompt Engineering for View Layer
-    # ----------------------------------------------------------------------
     def _build_view_prompt(self, chunks: List[str]) -> str:
         """
         Builds clean and minimal prompt for extracting VIEW layer.

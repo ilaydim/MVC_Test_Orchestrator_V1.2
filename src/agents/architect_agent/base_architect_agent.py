@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from src.rag.rag_pipeline import RAGPipeline
 from src.core.llm_client import LLMClient
+from src.core.config import DEFAULT_TOP_K
 
 
 class BaseArchitectAgent:
@@ -47,14 +48,16 @@ class BaseArchitectAgent:
         Indexes a PDF file into the RAG pipeline.
         Sub-agents inherit this method without duplicating logic.
         """
-        info = self.rag.index_pdf(file, chunk_size=chunk_size, overlap=overlap)
+
+        #It splits the PDF into chunks and extracts the embeddings. It puts them in the embedding store.
+        info = self.rag.index_pdf(file, chunk_size=chunk_size, overlap=overlap) 
         self.current_document = info["document_name"]
         return info
 
     # ----------------------------------------------------------------------
-    # Chunk Retrieval Helper (simplified for single-document RAG pipeline)
+    # Chunk Retrieval Helper 
     # ----------------------------------------------------------------------
-    def retrieve_chunks(self, query: str, k: int = 6):
+    def retrieve_chunks(self, query: str, k: int = DEFAULT_TOP_K) -> List[str]:
         """
         Retrieves top-k relevant chunks using the RAG pipeline.
 
@@ -94,20 +97,9 @@ class BaseArchitectAgent:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
         return output_path
-
-    # ----------------------------------------------------------------------
-    # LLM Call Helper (Optional)
-    # ----------------------------------------------------------------------
-    def run_llm(self, prompt: str) -> str:
-        """
-        Sends a raw prompt to the LLM.
-        Sub-agents typically build structured prompts before using this.
-        """
-        response = self.llm.model.generate_content(prompt)
-        return response.text.strip()
     
     # ----------------------------------------------------------------------
-    # JSON Parsing Helper
+    # JSON Parsing Helper 
     # ----------------------------------------------------------------------
     def parse_json(self, text: str) -> dict:
         """

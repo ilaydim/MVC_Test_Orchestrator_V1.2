@@ -2,6 +2,7 @@
 
 from typing import List, Dict, Any
 from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent
+from src.core.config import DEFAULT_TOP_K
 
 
 class ControllerArchitectAgent(BaseArchitectAgent):
@@ -20,7 +21,7 @@ class ControllerArchitectAgent(BaseArchitectAgent):
     # ----------------------------------------------------------------------
     # Main Entry Point
     # ----------------------------------------------------------------------
-    def extract_controllers(self, k: int = 6) -> Dict[str, Any]:
+    def extract_controllers(self, k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
         """
         Extracts CONTROLLER-level logic from SRS:
         user actions, workflows, input/output, system responses.
@@ -47,9 +48,7 @@ class ControllerArchitectAgent(BaseArchitectAgent):
 
         return controller_json
 
-    # ----------------------------------------------------------------------
-    # Prompt Engineering
-    # ----------------------------------------------------------------------
+
     def _build_controller_prompt(self, chunks: List[str]) -> str:
         """
         Builds clean and minimal prompt for extracting CONTROLLER layer.

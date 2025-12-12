@@ -2,6 +2,7 @@
 
 from typing import List, Dict, Any
 from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent
+from src.core.config import DEFAULT_TOP_K
 
 
 class ModelArchitectAgent(BaseArchitectAgent):
@@ -17,7 +18,7 @@ class ModelArchitectAgent(BaseArchitectAgent):
     # ----------------------------------------------------------------------
     # Main Entry Point
     # ----------------------------------------------------------------------
-    def extract_models(self, k: int = 6) -> Dict[str, Any]:
+    def extract_models(self, k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
         """
         High-level method for extracting model architecture.
         """
@@ -28,7 +29,7 @@ class ModelArchitectAgent(BaseArchitectAgent):
             "described in this software requirements specification."
         )
 
-        chunks = self.retrieve_chunks(query, k=k)
+        chunks = self.retrieve_chunks(query, k=k) #The query is converted to embedding, the nearest k chunks are taken
 
         if not chunks:
             raise ValueError("No relevant chunks found for model extraction.")
@@ -44,9 +45,6 @@ class ModelArchitectAgent(BaseArchitectAgent):
 
         return model_json
 
-    # ----------------------------------------------------------------------
-    # Model Prompt Engineering
-    # ----------------------------------------------------------------------
     def _build_model_prompt(self, chunks: List[str]) -> str:
         """
         Builds clean and minimal prompt for extracting MODEL layer.

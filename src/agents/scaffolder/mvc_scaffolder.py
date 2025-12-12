@@ -59,8 +59,7 @@ class MVCScaffolder:
 
         created_models = self._scaffold_models(architecture.get("model", []))
         created_views = self._scaffold_views(architecture.get("view", []))
-        created_controllers = self._scaffold_controllers(
-            architecture.get("controller", [])
+        created_controllers = self._scaffold_controllers(architecture.get("controller", [])
         )
 
         return {

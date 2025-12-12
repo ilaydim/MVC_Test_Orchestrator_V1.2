@@ -5,6 +5,7 @@ from typing import Dict, Any
 from src.agents.architect_agent.model_architect_agent import ModelArchitectAgent
 from src.agents.architect_agent.view_architect_agent import ViewArchitectAgent
 from src.agents.architect_agent.controller_architect_agent import ControllerArchitectAgent
+from src.core.config import DEFAULT_TOP_K
 
 
 class MVCArchitectOrchestrator:
@@ -27,7 +28,7 @@ class MVCArchitectOrchestrator:
     # ----------------------------------------------------------------------
     # Unified Architecture Extraction
     # ----------------------------------------------------------------------
-    def extract_full_architecture(self, k: int = 6) -> Dict[str, Any]:
+    def extract_full_architecture(self, k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
         """
         Runs all architect agents and merges outputs into a unified JSON map.
         """
@@ -37,8 +38,6 @@ class MVCArchitectOrchestrator:
         view_json = self.view_agent.extract_views(k=k)
         controller_json = self.controller_agent.extract_controllers(k=k)
 
-        # 🚨 IMPORTANT:
-        # Match UI format 100% (model/view/controller keys)
         architecture_map = {
             "model": model_json.get("model", []),
             "view": view_json.get("view", []),
