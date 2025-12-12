@@ -1,22 +1,21 @@
 {
   "name": "mvc-test-orchestrator",
-  "displayName": "MVC Test Orchestrator",
+  "displayName": "MVC Test Orchestrator V1.2",
   "description": "LLM-powered MVC architecture extractor and scaffolder.",
   "version": "0.0.1",
   "publisher": "your-name",
   "engines": {
     "vscode": "^1.80.0"
   },
-  "categories": ["Other"],
-
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
     "onCommand:mvc-test-orchestrator.extractArchitectureFromSRS",
     "onCommand:mvc-test-orchestrator.generateScaffold",
     "onView:mvcArchitectureView"
   ],
-
   "main": "./out/extension.js",
-
   "contributes": {
     "commands": [
       {
@@ -30,7 +29,6 @@
         "category": "MVC Orchestrator"
       }
     ],
-
     "viewsContainers": {
       "activitybar": [
         {
@@ -40,7 +38,6 @@
         }
       ]
     },
-
     "views": {
       "mvcArchitectureContainer": [
         {
@@ -50,14 +47,17 @@
       ]
     }
   },
-
   "scripts": {
+    "test": "mocha -r ts-node/register src/test/**/*.ts",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./"
   },
-
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.0.1",
     "@types/vscode": "^1.106.1",
+    "mocha": "^11.7.5",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }
