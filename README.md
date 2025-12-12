@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🧠 MVC Test Orchestrator  
 **Automatic MVC Architecture Extraction + Scaffolding from SRS Documents**  
 *A multi-agent LLM-powered system for software engineering teams.*
@@ -27,3 +28,6 @@ Sistem 3 farklı kullanım modu sunar:
 ```bash
 python -m venv .venv
 .\.venv\Scripts\activate     # Windows
+=======
+# MVC_Test_Orchestrator_V1.2
+>>>>>>> 028d692c73e347087bc3575aeee5ad44510ab9f7
