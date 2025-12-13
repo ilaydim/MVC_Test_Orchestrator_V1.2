@@ -1,4 +1,5 @@
 # src/rag/rag_pipeline.py
+from pathlib import Path
 
 import pdfplumber
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -132,17 +133,20 @@ class VectorStore:
 class RAGPipeline:
     """
     High-level RAG pipeline:
-    - loads PDF
+    - loads PDF/TXT
     - chunks pages
     - embeds + indexes chunks
+    - searches
     """
 
     def __init__(
         self,
+        llm_client=None, # <--- 1. DÜZELTME: llm_client parametresini kabul et
         collection_name: str = COLLECTION_NAME,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         overlap: int = DEFAULT_CHUNK_OVERLAP,
     ):
+        self.llm_client = llm_client # LLMClient'ı sakla
         self.chunk_size = chunk_size
         self.overlap = overlap
 
@@ -153,11 +157,23 @@ class RAGPipeline:
 
         self.offset = 0
 
-    def index_pdf(self, file, chunk_size: int | None = None, overlap: int | None = None):
-        pages = self.loader.load_pdf(file)
-        meta = self.loader.metadata
-        doc_name = meta["document_name"]
+    def index_srs(self, file_path: Path, chunk_size: int | None = None, overlap: int | None = None):
+        """
+        [2. DÜZELTME] SRS metin dosyasını indexlemek için özel bir metod.
+        Orchestrator'daki çağrı (index_text_file yerine index_srs) ile uyumludur.
+        Bu, altındaki index_pdf metoduyla aynı işlevi yapar, ancak TXT'yi Path objesinden okur.
+        """
+        # Burada, file_path'in zaten Path objesi olduğunu varsayıyoruz (SRSWriter'dan geliyor)
+        if file_path.suffix.lower() == '.txt':
+            content = file_path.read_text(encoding="utf-8")
+            pages = [content]
+            meta = {"document_name": file_path.name, "page_count": 1}
+        else:
+            raise ValueError(f"SRS indexing supports only .txt files, received: {file_path.suffix}")
 
+        doc_name = meta["document_name"]
+        
+        # Chunking ve Indexleme aynı kalır
         chunks = self.chunker.prepare_chunks(pages)
 
         count_new = self.vstore.add_chunks(
@@ -174,6 +190,36 @@ class RAGPipeline:
             "chunks_added": count_new,
             "total_chunks_in_db": self.vstore.count(),
         }
+
+
+    def index_pdf(self, file, chunk_size: int | None = None, overlap: int | None = None):
+        """
+        Mevcut index_pdf metodu (TXT kontrolü kaldırıldı, sadece PDF'e odaklanıldı)
+        """
+        
+        file_path = Path(file)
+        
+        if file_path.suffix.lower() == '.pdf':
+            with file_path.open("rb") as f:
+                 pages = self.loader.load_pdf(f) # PDFLoader file-like objeyi bekleyebilir
+                 meta = self.loader.metadata
+        else:
+            raise ValueError(f"Unsupported file format for index_pdf: {file_path.suffix}")
+
+        # Bu metodun geri kalanını, sadece PDF'e özel hale getirmek için önceki mantığa göre sadeleştirmelisiniz.
+        # Basitlik için, TXT mantığını çıkarıp sadece PDF'e odaklanırsak:
+        doc_name = meta["document_name"]
+        chunks = self.chunker.prepare_chunks(pages)
+        count_new = self.vstore.add_chunks(chunks, document_name=doc_name, start_id=self.offset)
+        self.offset += count_new
+
+        return {
+             "document_name": doc_name,
+             "page_count": meta["page_count"],
+             "chunks_added": count_new,
+             "total_chunks_in_db": self.vstore.count(),
+        }
+
 
     def search(self, query: str, k: int = DEFAULT_TOP_K):
         return self.vstore.query(query, k)

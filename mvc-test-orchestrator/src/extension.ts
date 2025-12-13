@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log("MVC Test Orchestrator VSCode extension activated.");
 
     // ------------------------------------------------------
-    // 1) Extract MVC Architecture Command
+    // 1) Extract MVC Architecture Command (GÜNCELLENDİ)
     // ------------------------------------------------------
     const extractCmd = vscode.commands.registerCommand(
         "mvc-test-orchestrator.extractArchitectureFromSRS",
@@ -25,20 +25,18 @@ export function activate(context: vscode.ExtensionContext) {
 
             const workspaceRoot = workspaceFolders[0].uri.fsPath;
 
-            // SRS PDF seçtir
-            const picked = await vscode.window.showOpenDialog({
-                title: "SRS PDF seç",
-                canSelectMany: false,
-                filters: { "PDF Files": ["pdf"] },
-                defaultUri: vscode.Uri.file(path.join(workspaceRoot, "data")),
+            // YENİ: Kullanıcıdan Fikir (User Idea) al (PDF seçme kaldırıldı)
+            const userIdea = await vscode.window.showInputBox({
+                prompt: "Lütfen yazılımınızın temel fikrini buraya girin (Örn: Bir E-ticaret platformu).",
+                placeHolder: "Kullanıcı fikri",
             });
 
-            if (!picked || picked.length === 0) return;
-
-            const srsPath = picked[0].fsPath;
+            if (!userIdea) return;
+            
+            // Çıktı yolu
             const outputPath = path.join(workspaceRoot, "data", "architecture_map.json");
 
-            // Python env detection
+            // Python env detection (Aynı kaldı)
             let pythonExec = "python";
             const venvWin = path.join(workspaceRoot, ".venv", "Scripts", "python.exe");
             const venvUnix = path.join(workspaceRoot, ".venv", "bin", "python");
@@ -46,9 +44,18 @@ export function activate(context: vscode.ExtensionContext) {
             if (fs.existsSync(venvWin)) pythonExec = `"${venvWin}"`;
             else if (fs.existsSync(venvUnix)) pythonExec = `"${venvUnix}"`;
 
-            const pythonCmd = `${pythonExec} -m src.cli.mvc_arch_cli extract --srs-path "${srsPath}" --output "${outputPath}"`;
+            // 1. Türkçe Karakterleri ve Güvenli Olmayan Karakterleri Geçici Olarak URL-Encoded yapalım (Opsiyonel ama önerilir)
+            const encodedIdea = encodeURIComponent(userIdea);
+            const encodedOutput = encodeURIComponent(outputPath); 
 
-            // Progress bar
+            // 2. Python Komutunu oluştururken, Python CLI'nın bu kodları alabilmesi için
+            // argümanları tırnak içine alıyoruz.
+            // Ayrıca, -m ile başlayan komutu, Windows'un tek bir dize olarak işlemesi için
+            // tüm komutu tek bir çift tırnak içine alabiliriz. Ancak bu bazen karışır.
+
+            // Daha güvenli yaklaşım: userIdea argümanını tek tırnakla sarmak.
+            const pythonCmd = `${pythonExec} -m src.cli.mvc_arch_cli extract --user-idea '${encodedIdea}' --output '${encodedOutput}'`;
+
             await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Notification,
@@ -57,8 +64,13 @@ export function activate(context: vscode.ExtensionContext) {
                 },
                 () =>
                     new Promise<void>((resolve) => {
-                        const proc = exec(pythonCmd, { cwd: workspaceRoot });
-
+                        const proc = exec(pythonCmd, { 
+                            cwd: workspaceRoot,
+                            // Python'a çıktı için UTF-8 kullanmasını söyler
+                            env: { ...process.env, PYTHONIOENCODING: 'utf-8' } 
+                        });
+                        
+                        // HATA YAKALAMAYI GÜÇLENDİR: stderr çıktısını logla
                         proc.stdout?.on("data", (d) => console.log("[extract stdout]", d.toString()));
                         proc.stderr?.on("data", (d) => console.error("[extract stderr]", d.toString()));
 
@@ -70,7 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
                                 );
                             } else {
                                 vscode.window.showErrorMessage(
-                                    `Python CLI failed (exit ${code})`
+                                    `Python CLI failed (exit ${code}). Detaylar için Developer Console'u kontrol edin.`
                                 );
                             }
                             resolve();
@@ -83,7 +95,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(extractCmd);
 
     // ------------------------------------------------------
-    // 2) Generate Scaffold Command
+    // 2) Generate Scaffold Command (Aynı kaldı)
     // ------------------------------------------------------
     const scaffoldCmd = vscode.commands.registerCommand(
         "mvc-test-orchestrator.generateScaffold",
@@ -146,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(scaffoldCmd);
 
     // ------------------------------------------------------
-    // 3) Register Single Tree Provider
+    // 3) Register Single Tree Provider (Aynı kaldı)
     // ------------------------------------------------------
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath ?? "";
     const mvcTree = new MVCTreeProvider(workspaceRoot);

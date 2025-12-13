@@ -37,7 +37,8 @@ class BaseArchitectAgent:
         self.current_document: Optional[str] = None
 
         # Output directory for agents that want to save results
-        self.data_dir = Path("data")
+        project_root = Path(__file__).resolve().parents[3] 
+        self.data_dir = project_root / "data" 
         self.data_dir.mkdir(exist_ok=True)
 
     # ----------------------------------------------------------------------

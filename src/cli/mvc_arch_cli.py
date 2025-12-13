@@ -2,62 +2,85 @@
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from src.rag.rag_pipeline import RAGPipeline
-from src.agents.architect_agent.mvc_architect_orchestrator import MVCArchitectOrchestrator
+# Yeni importlar: Pipeline'ın bağımlılıklarını ekle
+from src.rag.rag_pipeline import RAGPipeline 
+from src.core.llm_client import LLMClient 
+from src.agents.mvc_pipeline_orchestrator import MVCPipelineOrchestrator
 from src.agents.scaffolder.mvc_scaffolder import MVCScaffolder
 
 
 # ---------------------------------------------------------
-# extract command
+# extract command (SRS Yazarını da içeren tam pipeline)
 # ---------------------------------------------------------
 def cmd_extract(args: argparse.Namespace) -> None:
     """
-    CLI entry point for:
-        python -m src.cli.mvc_arch_cli extract --srs-path ... --output ...
+    Runs the full MVC Extraction pipeline (User Idea -> SRS -> Index -> Arch).
     """
-    srs_path = Path(args.srs_path).resolve()
+    
+    # Argümanları al
     output_path = Path(args.output).resolve()
+    user_idea = args.user_idea 
 
-    if not srs_path.exists():
-        print(f"[ERROR] SRS file not found: {srs_path}")
-        return
+    # 1) BAĞIMLILIKLARI BAŞLAT (KRİTİK DÜZELTME BURADA)
+    print("[INFO] Initializing RAG and LLM Clients...")
+    try:
+        # LLM ve RAGPipeline nesnelerini oluştur
+        llm_client = LLMClient()
+        # RAGPipeline, LLMClient'ı parametre olarak alır
+        rag_pipeline = RAGPipeline(llm_client=llm_client) 
+    except Exception as e:
+        print(f"[FATAL ERROR] Client initialization failed: {e}")
+        sys.exit(1)
 
-    print(f"[INFO] Using SRS PDF: {srs_path}")
+    # 2) Orchestrator'ı başlat ve bağımlılıkları aktar (Dependency Injection)
+    print("[INFO] Initializing MVC Pipeline Orchestrator...")
+    try:
+        # RAG ve LLM'i Orchestrator'ın __init__'ine aktar
+        orch = MVCPipelineOrchestrator(
+            rag_pipeline=rag_pipeline,
+            llm_client=llm_client
+        )
+    except Exception as e:
+        print(f"[FATAL ERROR] Orchestrator initialization failed: {e}")
+        sys.exit(1)
 
-    # 1) Build RAG + Orchestrator
-    rag = RAGPipeline()
-    orch = MVCArchitectOrchestrator(rag_pipeline=rag)
+    # 3) Tam pipeline'ı çalıştır
+    print(f"[INFO] Running full pipeline for user idea: '{user_idea[:40]}...'")
+    try:
+        final_result = orch.run_full_pipeline(user_idea=user_idea)
+    except Exception as e:
+        print(f"[FATAL ERROR] Pipeline execution failed: {e}")
+        sys.exit(1)
+        
+    
+    # 4) Çıktı Kontrolü ve Yazma
+    if final_result.get("status") == "COMPLETED":
+        # ... (Geri kalan başarı kodu aynı kalır)
+        architecture = final_result.get('architecture') 
+        
+        if not architecture:
+             print("[WARN] Pipeline completed but returned no architecture map.")
+             sys.exit(1)
 
-    # 2) Index SRS into RAG
-    print("[INFO] Indexing SRS into RAG pipeline...")
-    with srs_path.open("rb") as f:
-        index_info = rag.index_pdf(f)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", encoding="utf-8") as f:
+            # Buradaki 'architecture' anahtarı sizin MVCPipelineOrchestrator'ınızdan gelmelidir
+            # Eğer arch map'i final_result'ın kök seviyesinde dönmüyorsa, düzeltmeniz gerekebilir.
+            # Şimdilik final_result.get('architecture') olduğunu varsayıyoruz.
+            json.dump(architecture, f, indent=2, ensure_ascii=False)
 
-    doc_name = index_info.get("document_name")
-    page_count = index_info.get("page_count")
-    chunk_count = index_info.get("total_chunks_in_db")
-
-    print(
-        f"[INFO] Indexed document '{doc_name}' "
-        f"with {page_count} pages and {chunk_count} chunks."
-    )
-
-    # 3) Extract full architecture (Model / View / Controller)
-    print("[INFO] Extracting full MVC architecture (Model / View / Controller)...")
-    architecture = orch.extract_full_architecture(k=6)
-
-    # 4) Write JSON to output
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as f:
-        json.dump(architecture, f, indent=2, ensure_ascii=False)
-
-    print(f"[SUCCESS] Architecture JSON written to: {output_path}")
+        print(f"[SUCCESS] Full pipeline completed. Architecture JSON written to: {output_path}")
+    else:
+        # Eğer pipeline erken durursa (örn: RAG Indexleme Hatası)
+        print(f"[FAILED] Pipeline terminated early. Reason: {final_result.get('reason')}")
+        sys.exit(1)
 
 
 # ---------------------------------------------------------
-# scaffold command
+# scaffold command (AYNI KALDI)
 # ---------------------------------------------------------
 def cmd_scaffold(args: argparse.Namespace) -> None:
     """
@@ -98,18 +121,18 @@ def cmd_scaffold(args: argparse.Namespace) -> None:
         files = result.get(key, [])
         if not files:
             continue
-        print(f"  - {key.capitalize()}:")
+        print(f"  - {key.capitalize()}:")
         for p in files:
             # Show path relative to project root for readability
             try:
                 rel = p.relative_to(scaffolder.project_root)
             except ValueError:
                 rel = p
-            print(f"      * {rel}")
+            print(f"      * {rel}")
 
 
 # ---------------------------------------------------------
-# Main CLI parser
+# Main CLI parser (Argüman Düzeltmesi)
 # ---------------------------------------------------------
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -119,15 +142,15 @@ def main() -> None:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # extract
+    # extract komutu güncellendi
     p_extract = subparsers.add_parser(
         "extract",
-        help="Index an SRS PDF and extract full MVC architecture as JSON.",
+        help="Runs the full pipeline from user idea to architecture JSON.",
     )
     p_extract.add_argument(
-        "--srs-path",
+        "--user-idea", # <-- YENİ ARGÜMAN
         required=True,
-        help="Path to the SRS PDF file.",
+        help="The user's high-level idea for the software.",
     )
     p_extract.add_argument(
         "--output",
@@ -136,7 +159,7 @@ def main() -> None:
     )
     p_extract.set_defaults(func=cmd_extract)
 
-    # scaffold
+    # scaffold komutu aynı kaldı
     p_scaffold = subparsers.add_parser(
         "scaffold",
         help="Generate MVC scaffolds from an architecture JSON file.",

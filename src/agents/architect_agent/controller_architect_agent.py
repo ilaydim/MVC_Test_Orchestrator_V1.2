@@ -1,6 +1,7 @@
-# src/agents/architect_agent/controller_architect_agent.py
-
+import json
 from typing import List, Dict, Any
+from pathlib import Path
+
 from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent
 from src.core.config import DEFAULT_TOP_K
 
@@ -9,27 +10,60 @@ class ControllerArchitectAgent(BaseArchitectAgent):
     """
     Specialized architect agent responsible for extracting the CONTROLLER layer
     from an SRS document.
-
-    Focuses on:
-    - user actions / events
-    - system behavior / workflows
-    - controller responsibilities
-    - interactions with models and views
-    - validation and processing rules
+    
+    It reads structured entities and functions from previous agents (Requirements/Model)
+    to perform a targeted RAG search on user interactions and workflows.
     """
-
+    
+    def _load_analysis(self, filename: str) -> Dict[str, Any]:
+            """Loads structured JSON output from a previous agent."""
+            analysis_path = self.data_dir / filename
+            
+            # Dosya Var mı Kontrolü
+            if not analysis_path.exists():
+                raise FileNotFoundError(
+                    f"FATAL ERROR: ControllerAgent could not find dependency file: {filename}. "
+                    "Ensure preceding agent ran successfully and saved the file to /data."
+                )
+            
+            # JSON Formatı Kontrolü
+            try:
+                with open(analysis_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                # LLM'den gelen JSON'un bozuk olduğunu gösterir.
+                raise ValueError(
+                    f"FATAL ERROR: Could not decode JSON in {filename}. "
+                    f"LLM produced malformed JSON. Error: {e}"
+                )
     # ----------------------------------------------------------------------
     # Main Entry Point
     # ----------------------------------------------------------------------
     def extract_controllers(self, k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
         """
-        Extracts CONTROLLER-level logic from SRS:
-        user actions, workflows, input/output, system responses.
+        Extracts CONTROLLER-level logic from SRS using targeted RAG based on 
+        extracted functions and models.
         """
+        
+        # 1. Load data from preceding agents
+        requirements_data = self._load_analysis("requirements_analysis.json")
+        model_data = self._load_analysis("model_architecture.json")
+        
+        # Extract function list from Requirements Agent
+        functions = [f['name'] for f in requirements_data.get('system_functions', [])]
+        
+        # Extract entity list from Model Agent's output (which should be more refined)
+        entities = [m['name'] for m in model_data.get('model', [])]
+        
+        # Determine RAG query focus
+        functions_list = ", ".join(functions) if functions else "system actions"
+        entities_list = ", ".join(entities) if entities else "core data models"
 
+        # 2. Refine RAG Query using extracted structure (Targeted RAG)
         query = (
-            "Identify all system actions, workflows, user interactions, and controller "
-            "responsibilities described in this software requirements specification."
+            f"For the high-level functions: [{functions_list}] and the data models: [{entities_list}], "
+            "identify all user interactions, workflows, and specific controller "
+            "responsibilities (actions) described in the SRS. Focus on the flow."
         )
 
         chunks = self.retrieve_chunks(query, k=k)
@@ -40,10 +74,8 @@ class ControllerArchitectAgent(BaseArchitectAgent):
         # Build controller-specific prompt
         prompt = self._build_controller_prompt(chunks)
 
-        # Use BaseArchitectAgent's llm_json() for structured output
         controller_json = self.llm_json(prompt)
 
-        # Save final result
         self.save_output(controller_json, "controller_architecture.json")
 
         return controller_json
@@ -52,6 +84,7 @@ class ControllerArchitectAgent(BaseArchitectAgent):
     def _build_controller_prompt(self, chunks: List[str]) -> str:
         """
         Builds clean and minimal prompt for extracting CONTROLLER layer.
+        (Mevcut prompt yapısı korunmuştur, sadece bağlamı iyileşmiştir.)
         """
 
         context = ""
@@ -59,34 +92,33 @@ class ControllerArchitectAgent(BaseArchitectAgent):
             context += f"\n\n--- SRS Chunk {i+1} ---\n{c}\n"
 
         return f"""
-    You are a backend software architect.
-    Extract ONLY the CONTROLLERS and their ACTIONS.
+You are a backend software architect.
+Extract ONLY the CONTROLLERS and their ACTIONS.
 
-    ### VERY IMPORTANT RULES:
-    - Each controller has:
-        - name  (e.g., "UserController")
-        - actions (list of strings, e.g. ["login", "register"])
-    - DO NOT include inputs, outputs, parameters.
-    - DO NOT include descriptions of actions.
-    - DO NOT include next views.
-    - DO NOT include model operations.
-    - DO NOT infer CRUD automatically unless SRS clearly defines it.
-    - KEEP THE OUTPUT MINIMAL.
-    - NO repetition of controller names.
+### VERY IMPORTANT RULES:
+- Each controller has:
+    - name  (e.g., "UserController")
+    - actions (list of strings, e.g. ["login", "register"])
+- DO NOT include inputs, outputs, parameters.
+- DO NOT include descriptions of actions.
+- DO NOT include next views.
+- DO NOT include model operations.
+- DO NOT infer CRUD automatically unless SRS clearly defines it.
+- KEEP THE OUTPUT MINIMAL.
+- NO repetition of controller names.
 
-    ### STRICT JSON FORMAT (NO COMMENTS, NO EXTRA TEXT):
+### STRICT JSON FORMAT (NO COMMENTS, NO EXTRA TEXT):
+{{
+  "controller": [
     {{
-      "controller": [
-        {{
-          "name": "SomeController",
-          "actions": ["actionOne", "actionTwo"]
-        }}
-      ]
+      "name": "SomeController",
+      "actions": ["actionOne", "actionTwo"]
     }}
+  ]
+}}
 
-    ### SRS CONTEXT:
-    {context}
+### SRS CONTEXT:
+{context}
 
-    Return ONLY the JSON. No explanation.
-    """
-
+Return ONLY the JSON. No explanation.
+"""
