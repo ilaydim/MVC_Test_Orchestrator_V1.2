@@ -1,33 +1,62 @@
-<<<<<<< HEAD
-# 🧠 MVC Test Orchestrator  
-**Automatic MVC Architecture Extraction + Scaffolding from SRS Documents**  
-*A multi-agent LLM-powered system for software engineering teams.*
+# 🧠 MVC Architect Orchestrator
+
+**Otomatik MVC Mimari Çıkarımı ve İskelet Oluşturma (Scaffolding)**  
+Çoklu-agent’lı, LLM destekli yazılım mühendisliği sistemi.
 
 ---
 
-## 🚀 Overview  
-MVC Test Orchestrator, bir SRS (Software Requirements Specification) belgesini analiz ederek:
+## 🚀 Genel Bakış (Overview)
 
-- **Model Layer** (entities, relationships)
-- **View Layer** (screens, UI abstractions)
-- **Controller Layer** (actions, flows)
+**MVC Architect Orchestrator**, bir yazılım fikrini veya mevcut bir **Yazılım Gereksinimleri Şartnamesini (SRS)** analiz ederek **Model–View–Controller (MVC)** mimarisinin tüm katmanlarını otomatik olarak çıkaran ve bu mimariye dayalı bir **proje iskeleti (scaffold)** oluşturan gelişmiş bir pipeline’dır.
 
-çıkarır ve bunlardan otomatik bir proje iskeleti (**scaffold**) oluşturur.
-
-Sistem 3 farklı kullanım modu sunar:
-
-1. **Web UI (Streamlit)** – hızlı test & demo  
-2. **CLI (Command Line Interface)** – gerçek kullanım senaryosu  
-3. **VSCode Extension (Level 2/3)** – geliştirici ortamına gömülü kullanım (devam ediyor)
+Sistem; **LLM**, **RAG (Retrieval-Augmented Generation)** ve **çoklu agent mimarisi** kullanarak gereksinimlerden doğrudan yazılım mimarisi üretmeyi hedefler.
 
 ---
 
-## 📦 Installation
+## 🧩 Pipeline Aşamaları
 
-### 1. Create and Activate Virtual Environment
+1. **Gereksinim Girişi**
+   - Kullanıcı fikrinden otomatik SRS oluşturma  
+   - Veya mevcut `.txt` / `.pdf` SRS dosyasını yükleme
+
+2. **RAG Indexleme**
+   - Gereksinim dokümanlarının RAG sistemi için parçalanması ve indekslenmesi
+
+3. **Mimari Çıkarımı**
+   - Endekslenen veriler sorgulanarak sırasıyla:
+     - **Model Layer**: Varlıklar, ilişkiler
+     - **View Layer**: Ekranlar, UI soyutlamaları
+     - **Controller Layer**: İş akışları, eylemler
+
+4. **Scaffolding**
+   - Çıkarılan JSON mimarisinden proje klasör yapısı ve iskelet dosyalarının oluşturulması
+
+5. **Audit & Kodlama**
+   - Oluşturulan iskelet kodunun denetlenmesi
+   - İş mantığının eklenmesi ve mimari tutarlılık kontrolü
+
+---
+
+## ⚙️ Kullanım Modları
+
+Sistem, farklı geliştirme ihtiyaçlarına uyum sağlayacak şekilde çoklu kullanım modları sunar:
+
+- **CLI (Command Line Interface)**  
+  Gerçek projeler ve otomasyon senaryoları için
+
+- **VS Code Extension**  
+  Geliştirici ortamına gömülü kullanım (geliştirme aşamasında)
+
+- **Web UI (Streamlit)**  
+  Hızlı testler ve demo amaçlı kullanım
+
+---
+
+## 📦 Kurulum (Installation)
+
+### 1️⃣ Sanal Ortam Oluşturma ve Etkinleştirme
+
 ```bash
 python -m venv .venv
-.\.venv\Scripts\activate     # Windows
-=======
-# MVC_Test_Orchestrator_V1.2
->>>>>>> 028d692c73e347087bc3575aeee5ad44510ab9f7
+.\.venv\Scripts\activate    # Windows
+source .venv/bin/activate   # Linux / macOS

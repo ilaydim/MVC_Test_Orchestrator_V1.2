@@ -141,12 +141,12 @@ class RAGPipeline:
 
     def __init__(
         self,
-        llm_client=None, # <--- 1. DÜZELTME: llm_client parametresini kabul et
+        llm_client=None, # LLMClient'ı kabul et
         collection_name: str = COLLECTION_NAME,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         overlap: int = DEFAULT_CHUNK_OVERLAP,
     ):
-        self.llm_client = llm_client # LLMClient'ı sakla
+        self.llm_client = llm_client
         self.chunk_size = chunk_size
         self.overlap = overlap
 
@@ -159,23 +159,35 @@ class RAGPipeline:
 
     def index_srs(self, file_path: Path, chunk_size: int | None = None, overlap: int | None = None):
         """
-        [2. DÜZELTME] SRS metin dosyasını indexlemek için özel bir metod.
-        Orchestrator'daki çağrı (index_text_file yerine index_srs) ile uyumludur.
-        Bu, altındaki index_pdf metoduyla aynı işlevi yapar, ancak TXT'yi Path objesinden okur.
+        SRS belgesini (TXT veya PDF) RAG pipeline'ına indexler.
+        Bu metod, Orchestrator'ın çağırdığı tek indexleme metodudur.
         """
-        # Burada, file_path'in zaten Path objesi olduğunu varsayıyoruz (SRSWriter'dan geliyor)
-        if file_path.suffix.lower() == '.txt':
+        
+        file_path = Path(file_path) # Path objesi olduğunu garanti edelim
+        
+        if file_path.suffix.lower() == '.pdf':
+            # PDF işleme mantığı
+            print(f"[RAG] Loading content from PDF: {file_path.name}")
+            # PDFLoader file-like objeyi beklediği için 'rb' ile açıyoruz
+            with file_path.open("rb") as f: 
+                 pages = self.loader.load_pdf(f) 
+                 meta = self.loader.metadata
+        elif file_path.suffix.lower() == '.txt':
+            # TXT işleme mantığı (SRS Creation'dan gelen akış)
+            print(f"[RAG] Loading content from TXT: {file_path.name}")
             content = file_path.read_text(encoding="utf-8")
             pages = [content]
             meta = {"document_name": file_path.name, "page_count": 1}
         else:
-            raise ValueError(f"SRS indexing supports only .txt files, received: {file_path.suffix}")
+            # Desteklenmeyen format hatası
+            raise ValueError(f"Unsupported document format for SRS indexing: {file_path.suffix}. Only .txt and .pdf are supported.")
 
         doc_name = meta["document_name"]
         
-        # Chunking ve Indexleme aynı kalır
+        # Chunking
         chunks = self.chunker.prepare_chunks(pages)
 
+        # Indexleme
         count_new = self.vstore.add_chunks(
             chunks,
             document_name=doc_name,
@@ -191,35 +203,9 @@ class RAGPipeline:
             "total_chunks_in_db": self.vstore.count(),
         }
 
-
-    def index_pdf(self, file, chunk_size: int | None = None, overlap: int | None = None):
-        """
-        Mevcut index_pdf metodu (TXT kontrolü kaldırıldı, sadece PDF'e odaklanıldı)
-        """
-        
-        file_path = Path(file)
-        
-        if file_path.suffix.lower() == '.pdf':
-            with file_path.open("rb") as f:
-                 pages = self.loader.load_pdf(f) # PDFLoader file-like objeyi bekleyebilir
-                 meta = self.loader.metadata
-        else:
-            raise ValueError(f"Unsupported file format for index_pdf: {file_path.suffix}")
-
-        # Bu metodun geri kalanını, sadece PDF'e özel hale getirmek için önceki mantığa göre sadeleştirmelisiniz.
-        # Basitlik için, TXT mantığını çıkarıp sadece PDF'e odaklanırsak:
-        doc_name = meta["document_name"]
-        chunks = self.chunker.prepare_chunks(pages)
-        count_new = self.vstore.add_chunks(chunks, document_name=doc_name, start_id=self.offset)
-        self.offset += count_new
-
-        return {
-             "document_name": doc_name,
-             "page_count": meta["page_count"],
-             "chunks_added": count_new,
-             "total_chunks_in_db": self.vstore.count(),
-        }
-
-
+    # index_pdf metodunu artık çağırmayacağımız için temizlik amacıyla kaldırıyoruz veya pasif bırakıyoruz.
+    # index_pdf metodu KALDIRILMIŞTIR/KULLANILMAYACAKTIR.
+    # Eğer başka bir kod parçası index_pdf'i çağırıyorsa, onu index_srs'e yönlendirebilirsiniz.
+    
     def search(self, query: str, k: int = DEFAULT_TOP_K):
         return self.vstore.query(query, k)

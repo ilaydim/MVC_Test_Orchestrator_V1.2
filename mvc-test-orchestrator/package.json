@@ -11,21 +11,40 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:mvc-test-orchestrator.extractArchitectureFromSRS",
+    "onCommand:mvc-test-orchestrator.createSrsAndExtract",
+    "onCommand:mvc-test-orchestrator.indexSrsAndExtract",
     "onCommand:mvc-test-orchestrator.generateScaffold",
+    "onCommand:mvc-test-orchestrator.runAudit", 
+    "onCommand:mvc-test-orchestrator.runCode",
     "onView:mvcArchitectureView"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
+{
+        "command": "mvc-test-orchestrator.createSrsAndExtract",
+        "title": "MVC: 1a. Create SRS (from idea) & Extract Architecture",
+        "category": "MVC Orchestrator"
+      },
       {
-        "command": "mvc-test-orchestrator.extractArchitectureFromSRS",
-        "title": "MVC: Extract MVC Architecture From SRS",
+        "command": "mvc-test-orchestrator.indexSrsAndExtract",
+        "title": "MVC: 1b. Extract Architectur from Existing SRS ",
         "category": "MVC Orchestrator"
       },
       {
         "command": "mvc-test-orchestrator.generateScaffold",
-        "title": "MVC: Generate Scaffold",
+        "title": "MVC: 2. Generate Scaffold",
+        "category": "MVC Orchestrator"
+      },
+      { 
+        "command": "mvc-test-orchestrator.runCode",
+        "title": "MVC: 3. Generate Code Logic (Coder Agent)",
+        "category": "MVC Orchestrator"
+
+      },
+      {
+        "command": "mvc-test-orchestrator.runAudit",
+        "title": "MVC: 4. Run Quality Audit (Rules & Reviewer)",
         "category": "MVC Orchestrator"
       }
     ],

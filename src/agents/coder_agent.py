@@ -2,6 +2,7 @@ import json
 from typing import Dict, Any, List
 from pathlib import Path
 
+# BaseArchitectAgent'tan miras alıyoruz
 from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent 
 
 class CoderAgent(BaseArchitectAgent):
@@ -12,7 +13,7 @@ class CoderAgent(BaseArchitectAgent):
 
     def __init__(self, rag_pipeline=None, llm_client=None):
         super().__init__(rag_pipeline, llm_client)
-        # Assuming Scaffolder's root path is known or configured
+        # KRİTİK DÜZELTME: Scaffold kök yolu Path yapısıyla güvenli hale getirildi
         self.scaffold_root = Path(__file__).resolve().parents[3] / "scaffolds" / "mvc_skeleton"
 
 
@@ -32,13 +33,8 @@ class CoderAgent(BaseArchitectAgent):
 
 
     def generate_code(self) -> Dict[str, List[Path]]:
-        """
-        Main entry point for code generation. Iterates through scaffold files
-        and calls the LLM for code completion.
-        """
         
         data = self._load_files()
-        
         completed_files: List[Path] = []
 
         # 1. Model Dosyalarını Kodla
@@ -49,9 +45,6 @@ class CoderAgent(BaseArchitectAgent):
         controllers_dir = self.scaffold_root / "controllers"
         completed_files.extend(self._process_controller_files(controllers_dir, data))
         
-        # NOTE: View dosyalarını kodlama (HTML/JS/vb.) daha karmaşık olabilir. 
-        # Şimdilik sadece Model ve Controller'a odaklanalım.
-
         return {"completed_files": completed_files}
 
 
@@ -62,35 +55,53 @@ class CoderAgent(BaseArchitectAgent):
         for file_path in directory.rglob("*.py"):
             print(f"Coding Model: {file_path.name}")
             skeleton_content = file_path.read_text(encoding="utf-8")
-            
             prompt = self._build_model_code_prompt(skeleton_content, data)
             
-            # LLM'den kodu direkt string olarak alıyoruz (JSON değil)
-            new_code = self.llm.model.generate_content(prompt).text.strip()
+            new_code = skeleton_content
+            try:
+                # KRİTİK DÜZELTME 1: Timeout eklendi (60 saniye)
+                response = self.llm.model.generate_content(
+                    prompt, 
+                    request_options={"timeout": 60} 
+                )
+                new_code = response.text.strip()
+            except Exception as e:
+                print(f"[ERROR] LLM Code Generation Timeout/Error for {file_path.name}: {e}")
             
-            # Kod etiketlerini temizle ve dosyayı yeni kodla overwrite et
-            cleaned_code = new_code.strip("`").replace("python", "").replace("py", "").strip()
-            file_path.write_text(cleaned_code, encoding="utf-8")
-            completed.append(file_path)
+            
+            # GÜÇLENDİRİLMİŞ TEMİZLEME MANTIĞI: Sadece Markdown etiketlerini kaldır.
+            final_code = new_code.strip()
+            # Önce en yaygın Python etiketlerini kaldırma
+            final_code = final_code.replace("```python", "").replace("```py", "").replace("```", "").strip()
+            
+            # KRİTİK KONTROL: Kodun uzunluğu 50 karakterden büyükse VE iskeletten farklıysa yaz.
+            is_valid_code = len(final_code) > 50 and ('class' in final_code or 'def' in final_code)
+            is_different = final_code != skeleton_content.strip()
+
+            if is_valid_code and is_different:
+                try:
+                    file_path.write_text(final_code, encoding="utf-8")
+                    completed.append(file_path)
+                    print(f"[SUCCESS] Wrote code to {file_path.name}")
+                except Exception as write_error:
+                    print(f"[FATAL WRITE ERROR] Could not write to {file_path.name}: {write_error}")
+            else:
+                print(f"[WARNING] Skipping write for {file_path.name}: LLM returned empty/identical code. Valid Check: {is_valid_code}, Different Check: {is_different}")
             
         return completed
 
 
     def _build_model_code_prompt(self, skeleton: str, data: Dict[str, Any]) -> str:
-        """
-        Prompts the LLM to complete the Model class by adding __init__ attributes 
-        based on the SRS and defined architecture.
-        """
-        srs = data['srs']
         
+        srs = data['srs']
         return f"""
 You are a Python Senior Developer. Your task is to complete the provided Python Model 
 class skeleton based on the SRS and the high-level architecture.
 
 ### GOAL:
-1.  Complete the class definition (e.g., add attributes in __init__).
-2.  Add necessary getter/setter methods, or simple CRUD methods (e.g., save(), find_by_id()).
-3.  The final code MUST be valid, clean Python code.
+1. Complete the class definition (e.g., add attributes in __init__).
+2. Add necessary getter/setter methods, or simple CRUD methods (e.g., save(), find_by_id()).
+3. The final code MUST be valid, clean Python code.
 
 ### ARCHITECTURE CONTEXT (for class name/purpose):
 {data['architecture']['model']}
@@ -103,4 +114,68 @@ class skeleton based on the SRS and the high-level architecture.
 
 Return ONLY the complete, final Python code block. NO explanation, NO JSON.
 """
-# ... _process_controller_files metodu benzer şekilde yazılacaktır.
+
+    def _process_controller_files(self, directory: Path, data: Dict[str, Any]) -> List[Path]:
+        
+        completed: List[Path] = []
+        for file_path in directory.rglob("*.py"):
+            print(f"Coding Controller: {file_path.name}")
+            skeleton_content = file_path.read_text(encoding="utf-8")
+            prompt = self._build_controller_code_prompt(skeleton_content, data)
+            
+            new_code = skeleton_content
+            try:
+                # KRİTİK DÜZELTME 1: Timeout eklendi (60 saniye)
+                response = self.llm.model.generate_content(
+                    prompt, 
+                    request_options={"timeout": 60} 
+                )
+                new_code = response.text.strip()
+            except Exception as e:
+                print(f"[ERROR] LLM Code Generation Timeout/Error for {file_path.name}: {e}")
+            
+            # GÜÇLENDİRİLMİŞ TEMİZLEME MANTIĞI: Sadece Markdown etiketlerini kaldır.
+            final_code = new_code.strip()
+            # Önce en yaygın Python etiketlerini kaldırma
+            final_code = final_code.replace("```python", "").replace("```py", "").replace("```", "").strip()
+
+            # KRİTİK KONTROL: Kodun uzunluğu 50 karakterden büyükse VE iskeletten farklıysa yaz.
+            is_valid_code = len(final_code) > 50 and ('class' in final_code or 'def' in final_code)
+            is_different = final_code != skeleton_content.strip()
+
+            if is_valid_code and is_different:
+                try:
+                    file_path.write_text(final_code, encoding="utf-8")
+                    completed.append(file_path)
+                    print(f"[SUCCESS] Wrote code to {file_path.name}")
+                except Exception as write_error:
+                    print(f"[FATAL WRITE ERROR] Could not write to {file_path.name}: {write_error}")
+            else:
+                print(f"[WARNING] Skipping write for {file_path.name}: LLM returned empty/identical code. Valid Check: {is_valid_code}, Different Check: {is_different}")
+            
+        return completed
+
+
+    def _build_controller_code_prompt(self, skeleton: str, data: Dict[str, Any]) -> str:
+        
+        srs = data['srs']
+        return f"""
+You are a Python Senior Developer specialized in API/web framework Controllers. Your task is to complete the provided Controller class skeleton.
+
+### GOAL:
+1. Define API/routing endpoints (e.g., using Flask/Django decorators or simple methods).
+2. Implement methods to handle requests (e.g., GET /products, POST /users).
+3. Use the business logic defined in the architecture map.
+4. The final code MUST be valid, clean Python code.
+
+### ARCHITECTURE CONTEXT (for class name/purpose):
+{data['architecture']['controller']}
+
+### SRS CONTENT (for detailed business logic/flows):
+{srs[:2000]} 
+
+### SKELETON TO COMPLETE:
+{skeleton}
+
+Return ONLY the complete, final Python code block. NO explanation, NO JSON.
+"""
