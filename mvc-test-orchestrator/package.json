@@ -23,12 +23,12 @@
     "commands": [
 {
         "command": "mvc-test-orchestrator.createSrsAndExtract",
-        "title": "MVC: 1a. Create SRS (from idea) & Extract Architecture",
+        "title": "MVC: 1a. Create SRS (from idea) - Step 1",
         "category": "MVC Orchestrator"
       },
       {
         "command": "mvc-test-orchestrator.indexSrsAndExtract",
-        "title": "MVC: 1b. Extract Architectur from Existing SRS ",
+        "title": "MVC: 1b. Extract Architecture from SRS - Step 2",
         "category": "MVC Orchestrator"
       },
       {

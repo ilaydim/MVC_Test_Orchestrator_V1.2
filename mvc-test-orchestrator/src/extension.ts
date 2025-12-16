@@ -57,14 +57,16 @@ async function runPythonCommand(
                         // YENİ DÜZELTME: Komuta göre doğru başarı mesajını göster.
                         let successMessage = `Command '${commandName}' executed successfully.`;
                         
-                        if (commandName === "create-srs" || commandName === "index-srs") {
+                        if (commandName === "create-srs") {
+                            successMessage = `SRS created → data/srs_document.txt\nNext: Run "Extract Architecture from Existing SRS" to generate architecture.`;
+                        } else if (commandName === "index-srs") {
                             successMessage = `Architecture extracted → data/architecture_map.json`;
                         } else if (commandName === "scaffold") {
                             successMessage = "Scaffold created successfully in /scaffolds/mvc_skeleton/";
                         } else if (commandName === "run-code") {
                             successMessage = "Code generation complete! Check /scaffolds/mvc_skeleton/";
                         } else if (commandName === "run-audit") {
-                            successMessage = "Audit completed. Check data/audit_result.txt";
+                            successMessage = "Audit completed. Check data/final_audit_report.json";
                         }
                         
                         vscode.window.showInformationMessage(successMessage);
@@ -92,7 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 
     // ------------------------------------------------------
-    // 1a) CREATE SRS & EXTRACT MVC 
+    // 1a) CREATE SRS ONLY (from user idea)
     // ------------------------------------------------------
     const createCmd = vscode.commands.registerCommand(
         "mvc-test-orchestrator.createSrsAndExtract",
@@ -107,30 +109,90 @@ export function activate(context: vscode.ExtensionContext) {
             const safeUserIdea = JSON.stringify(userIdea);
             const args = `--user-idea ${safeUserIdea}`;
 
-            await runPythonCommand(workspaceRoot, "create-srs", args, "architecture_map.json");
+            // YENİ: create-srs artık sadece SRS üretiyor, output SRS dosyası olmalı
+            await runPythonCommand(workspaceRoot, "create-srs", args, "srs_document.txt");
         }
     );
 
     // ------------------------------------------------------
-    // 1b) INDEX SRS & EXTRACT MVC
+    // 1b) EXTRACT ARCHITECTURE FROM SRS (index-srs)
     // ------------------------------------------------------
     const indexCmd = vscode.commands.registerCommand(
         "mvc-test-orchestrator.indexSrsAndExtract",
         async () => {
-            const picked = await vscode.window.showOpenDialog({
-                title: "Select Existing SRS (.txt, .pdf) File",
-                canSelectMany: false,
-                filters: { "SRS Files": ["txt", "pdf"] },
-                defaultUri: vscode.Uri.file(path.join(workspaceRoot, "data")),
-            });
-
-            if (!picked || picked.length === 0) return;
-
-            const srsPath = picked[0].fsPath;
+            // Önce kullanıcıya seçenek sun: Az önce oluşturulan SRS mi, yoksa dosya seçimi mi?
+            const defaultSrsPath = path.join(workspaceRoot, "data", "srs_document.txt");
+            const defaultSrsExists = fs.existsSync(defaultSrsPath);
+            
+            let srsPath: string | undefined;
+            
+            if (defaultSrsExists) {
+                // Quick pick ile seçenek sun
+                const choice = await vscode.window.showQuickPick([
+                    {
+                        label: "$(file-text) Use recently created SRS",
+                        description: `data/srs_document.txt`,
+                        detail: "Use the SRS file created in Step 1a",
+                        value: "default"
+                    },
+                    {
+                        label: "$(folder-opened) Select SRS file from disk",
+                        description: "Choose a different .txt or .pdf file",
+                        detail: "Browse and select any SRS file",
+                        value: "browse"
+                    }
+                ], {
+                    placeHolder: "How do you want to select the SRS file?",
+                    ignoreFocusOut: true
+                });
+                
+                if (!choice) return; // Kullanıcı iptal etti
+                
+                if (choice.value === "default") {
+                    srsPath = defaultSrsPath;
+                } else {
+                    // Dosya seçim dialogunu aç
+                    const picked = await vscode.window.showOpenDialog({
+                        title: "Select Existing SRS (.txt, .pdf) File",
+                        canSelectMany: false,
+                        filters: { 
+                            "SRS Files": ["txt", "pdf"],
+                            "All Files": ["*"]
+                        },
+                        defaultUri: vscode.Uri.file(path.join(workspaceRoot, "data")),
+                    });
+                    
+                    if (!picked || picked.length === 0) return;
+                    srsPath = picked[0].fsPath;
+                }
+            } else {
+                // Default SRS yoksa direkt dosya seçimi yap
+                const picked = await vscode.window.showOpenDialog({
+                    title: "Select Existing SRS (.txt, .pdf) File",
+                    canSelectMany: false,
+                    filters: { 
+                        "SRS Files": ["txt", "pdf"],
+                        "All Files": ["*"]
+                    },
+                    defaultUri: vscode.Uri.file(path.join(workspaceRoot, "data")),
+                });
+                
+                if (!picked || picked.length === 0) return;
+                srsPath = picked[0].fsPath;
+            }
+            
+            if (!srsPath) return;
+            
+            // Dosyanın gerçekten var olduğunu kontrol et
+            if (!fs.existsSync(srsPath)) {
+                vscode.window.showErrorMessage(`SRS file not found: ${srsPath}`);
+                return;
+            }
             
             const safeSrsPath = JSON.stringify(srsPath);
             const args = `--srs-path ${safeSrsPath}`;
             
+            // index-srs mimari çıkarır ve architecture_map.json oluşturur
             await runPythonCommand(workspaceRoot, "index-srs", args, "architecture_map.json");
         }
     );

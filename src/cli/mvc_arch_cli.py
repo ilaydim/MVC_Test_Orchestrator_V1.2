@@ -9,15 +9,27 @@ from src.agents.mvc_pipeline_orchestrator import MVCPipelineOrchestrator
 from src.agents.scaffolder.mvc_scaffolder import MVCScaffolder
 
 
-# --- Yardımcı Fonksiyon (Kod tekrarını azaltmak için) ---
-def _run_extraction_pipeline(user_idea: str = None, srs_path: Path = None, output_path: Path = None, skip_scaffold: bool = False):
-    """Ortak Pipeline çalıştırma mantığı."""
-    
+    # --- Yardımcı Fonksiyon (Kod tekrarını azaltmak için) ---
+def _run_extraction_pipeline(
+    user_idea: str = None,
+    srs_path: Path = None,
+    output_path: Path = None,
+    skip_scaffold: bool = False,  # Artık kullanılmıyor ama CLI imzası için tutuluyor
+):
+    """
+    Ortak mimari çıkarma mantığı.
+
+    Yeni akış:
+      - Eğer user_idea verilmişse önce SRS üretilir.
+      - Ardından verilen/üretilen SRS üzerinden sadece mimari çıkarılır
+        ve JSON olarak output_path'e yazılır (scaffold / code / audit yok).
+    """
+
     # 1) Bağımlılıkları Başlat
     print("[INFO] Initializing RAG and LLM Clients...")
     try:
         llm_client = LLMClient()
-        rag_pipeline = RAGPipeline(llm_client=llm_client) 
+        rag_pipeline = RAGPipeline(llm_client=llm_client)
     except Exception as e:
         print(f"[FATAL ERROR] Client initialization failed: {e}")
         sys.exit(1)
@@ -27,49 +39,94 @@ def _run_extraction_pipeline(user_idea: str = None, srs_path: Path = None, outpu
     try:
         orch = MVCPipelineOrchestrator(
             rag_pipeline=rag_pipeline,
-            llm_client=llm_client
+            llm_client=llm_client,
         )
     except Exception as e:
         print(f"[FATAL ERROR] Orchestrator initialization failed: {e}")
         sys.exit(1)
 
-    # 3) Pipeline'ı çalıştır
+    # 3) SRS kaynağını belirle (user_idea veya mevcut SRS dosyası)
+    current_srs_path: Path | None = None
+
     if user_idea:
-        print(f"[INFO] Running pipeline from user idea: '{user_idea[:40]}...'")
-        final_result = orch.run_full_pipeline(user_idea=user_idea, skip_scaffold=skip_scaffold)
+        print(f"[INFO] Generating SRS from user idea: '{user_idea[:40]}...'")
+        try:
+            current_srs_path = orch.srs_writer_agent.generate_srs(user_idea)
+        except Exception as e:
+            print(f"[FATAL ERROR] SRS generation failed: {e}")
+            sys.exit(1)
+
     elif srs_path:
-        print(f"[INFO] Running pipeline from existing SRS: {srs_path.name}")
-        final_result = orch.run_full_pipeline(srs_path=srs_path, skip_scaffold=skip_scaffold)
+        current_srs_path = srs_path
+        print(f"[INFO] Using existing SRS: {current_srs_path.name}")
+        if not current_srs_path.exists():
+            print(f"[FATAL ERROR] SRS file not found: {current_srs_path}")
+            sys.exit(1)
+
     else:
         print("[FATAL ERROR] No user idea or SRS path provided for extraction/creation.")
         sys.exit(1)
-        
 
-    # 4) Çıktı Kontrolü ve Yazma (Sadece mimari çıkış yapıldıysa JSON yazar)
-    if final_result.get("status") == "COMPLETED":
-        architecture = final_result.get('architecture') 
-        
-        if architecture and output_path:
-             output_path.parent.mkdir(parents=True, exist_ok=True)
-             with output_path.open("w", encoding="utf-8") as f:
-                json.dump(architecture, f, indent=2, ensure_ascii=False)
-             print(f"[SUCCESS] Full pipeline completed. Architecture JSON written to: {output_path}")
-        else:
-             print("[SUCCESS] Pipeline completed (Audit/Code phase). No new architecture JSON written.")
-    else:
-        print(f"[FAILED] Pipeline terminated early. Reason: {final_result.get('reason')}")
+    if output_path is None:
+        print("[FATAL ERROR] No output path provided for architecture JSON.")
         sys.exit(1)
+
+    # 4) Yalnızca mimari çıkarma (senin yeni Orchestrator metoduna göre)
+    orch.run_extraction_only(current_srs_path, str(output_path))
 
 
 # ---------------------------------------------------------
 # create-srs command
 # ---------------------------------------------------------
 def cmd_create_srs(args: argparse.Namespace) -> None:
+    """
+    YENİ DAVRANIŞ:
+      - Sadece user_idea'dan SRS üretir.
+      - Scaffold / mimari çıkarma BU ADIMDA yapılmaz.
+      - Üretilen SRS dosyası, --output ile verilen yola taşınır.
+      - Sonrasında MİMARİ çıkarmak için ayrı olarak index-srs komutu kullanılmalıdır.
+    """
     output_path = Path(args.output).resolve()
-    user_idea = args.user_idea 
-    
-    # Varsayılan olarak scaffold'u atlamadan çalıştırır. (Eğer sadece extract isteniyorsa skip_scaffold=True olmalı)
-    _run_extraction_pipeline(user_idea=user_idea, output_path=output_path, skip_scaffold=args.skip_scaffold)
+    user_idea = args.user_idea
+
+    # 1) Bağımlılıkları Başlat (LLM için gerekli)
+    print("[INFO] Initializing RAG and LLM Clients for SRS creation...")
+    try:
+        llm_client = LLMClient()
+        rag_pipeline = RAGPipeline(llm_client=llm_client)
+    except Exception as e:
+        print(f"[FATAL ERROR] Client initialization failed: {e}")
+        sys.exit(1)
+
+    # 2) Orchestrator'ı Başlat
+    print("[INFO] Initializing MVC Pipeline Orchestrator (SRS only)...")
+    try:
+        orch = MVCPipelineOrchestrator(
+            rag_pipeline=rag_pipeline,
+            llm_client=llm_client,
+        )
+    except Exception as e:
+        print(f"[FATAL ERROR] Orchestrator initialization failed: {e}")
+        sys.exit(1)
+
+    # 3) Sadece SRS üret
+    try:
+        srs_path = orch.srs_writer_agent.generate_srs(user_idea)
+    except Exception as e:
+        print(f"[FATAL ERROR] SRS generation failed: {e}")
+        sys.exit(1)
+
+    # 4) Üretilen SRS'i kullanıcı tarafından belirtilen yola taşı
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        final_srs_path = srs_path.replace(output_path)
+    except Exception:
+        # replace başarısız olursa kopyala
+        content = srs_path.read_text(encoding="utf-8")
+        output_path.write_text(content, encoding="utf-8")
+        final_srs_path = output_path
+
+    print(f"[SUCCESS] SRS created successfully at: {final_srs_path}")
 
 
 # ---------------------------------------------------------
@@ -97,7 +154,17 @@ def cmd_scaffold(args: argparse.Namespace) -> None:
         return
 
     with arch_path.open("r", encoding="utf-8") as f:
-        architecture = json.load(f)
+        full_data = json.load(f)
+
+    # JSON yapısını kontrol et: "architecture" key'i var mı?
+    # Eğer varsa (run_extraction_only çıktısı), onu kullan
+    # Yoksa direkt root'u kullan (eski format veya direkt architecture map)
+    if "architecture" in full_data:
+        architecture = full_data["architecture"]
+        print(f"[INFO] Using 'architecture' key from JSON structure.")
+    else:
+        architecture = full_data
+        print(f"[INFO] Using root-level architecture structure.")
 
     scaffolder = MVCScaffolder()
     print(
@@ -136,8 +203,15 @@ def cmd_scaffold(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------
 def cmd_run_audit(args: argparse.Namespace) -> None:
     """
-    Mimari (JSON) ve Scaffold (dosyalar) üzerinden Audit aşamasını çalıştırır (PHASE 4).
+    Mimari (JSON) ve Scaffold (dosyalar) üzerinden Audit aşamasını çalıştırır.
+    Orchestrator'ın run_audit_only metodunu kullanır.
     """
+    arch_path = Path(args.arch_path).resolve()
+    
+    if not arch_path.exists():
+        print(f"[ERROR] Architecture JSON not found: {arch_path}")
+        sys.exit(1)
+    
     # 1) Orchestrator'ı başlat (RAG/LLM bağımlılıklarıyla)
     try:
         llm_client = LLMClient()
@@ -147,19 +221,16 @@ def cmd_run_audit(args: argparse.Namespace) -> None:
         print(f"[FATAL ERROR] Orchestrator initialization failed: {e}")
         sys.exit(1)
     
-    # Audit'in çalışması için mimari JSON'un RulesAgent tarafından yüklenebilir olması gerekir.
-    print("[INFO] Running PHASE 4: Quality Audit...")
+    # 2) Orchestrator'ın run_audit_only metodunu kullan
+    print("[INFO] Running Quality Audit...")
     try:
-        scaffold_root = orch.scaffolder.scaffold_root 
+        final_report = orch.run_audit_only(arch_path)
         
-        # Rules Agent: Teknik ihlalleri tespit eder.
-        technical_violations = orch.rules_agent.detect_violations(scaffold_root)
-        
-        # Reviewer Agent: İhlalleri doğal dil önerilerine çevirir.
-        final_audit_report = orch.reviewer_agent.generate_audit_report(technical_violations)
-        
-        print("[SUCCESS] Audit completed.")
-        print(f"Audit Report: \n{final_audit_report}")
+        if final_report:
+            print("[SUCCESS] Audit completed.")
+            print(f"Audit Report saved to: {arch_path.parent / 'final_audit_report.json'}")
+        else:
+            print("[WARN] Audit completed but no report was generated.")
         
     except Exception as e:
         print(f"[FATAL ERROR] Audit execution failed: {e}")
@@ -205,7 +276,7 @@ def main() -> None:
     # create-srs komutu
     p_create = subparsers.add_parser(
         "create-srs",
-        help="Creates SRS from user idea, indexes it, and extracts MVC architecture.",
+        help="Creates SRS from user idea (no architecture extraction).",
     )
     p_create.add_argument(
         "--user-idea", 
@@ -227,7 +298,7 @@ def main() -> None:
     # index-srs komutu
     p_index = subparsers.add_parser(
         "index-srs",
-        help="Loads an existing SRS file, indexes it, and extracts MVC architecture.",
+        help="Loads an existing SRS file and extracts MVC architecture.",
     )
     p_index.add_argument(
         "--srs-path", 

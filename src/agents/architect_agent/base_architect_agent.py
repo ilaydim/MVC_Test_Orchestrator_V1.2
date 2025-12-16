@@ -1,7 +1,9 @@
 # src/agents/architect_agent/base_architect_agent.py
+import time
 
 from pathlib import Path
 from typing import List, Optional
+from google.api_core import exceptions as google_exceptions
 
 from src.rag.rag_pipeline import RAGPipeline
 from src.core.llm_client import LLMClient
@@ -126,10 +128,68 @@ class BaseArchitectAgent:
     # ----------------------------------------------------------------------
     # LLM JSON Wrapper (High-Level)
     # ----------------------------------------------------------------------
-    def llm_json(self, prompt: str) -> dict:
+    def llm_json(self, prompt: str, max_retries: int = 3) -> dict:
         """
         Sends a prompt to LLM and parses the returned JSON using parse_json().
+        429 quota hatalarında otomatik retry yapar (API'nin önerdiği delay ile).
         """
-        response = self.llm.model.generate_content(prompt)
-        text = response.text.strip()
-        return self.parse_json(text)
+        # Rate limiting için kısa bir delay (her çağrı arasında)
+        time.sleep(12)
+        
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                response = self.llm.model.generate_content(prompt)
+                text = response.text.strip()
+                return self.parse_json(text)
+                
+            except google_exceptions.ResourceExhausted as e:
+                # 429 quota hatası - API'nin önerdiği delay'i kullan
+                last_exception = e
+                
+                # Retry delay'i exception'dan al (eğer varsa)
+                retry_delay = 30  # varsayılan 30 saniye
+                
+                # Önce exception'un retry_delay attribute'unu kontrol et
+                if hasattr(e, 'retry_delay') and e.retry_delay:
+                    if hasattr(e.retry_delay, 'total_seconds'):
+                        retry_delay = e.retry_delay.total_seconds()
+                    elif hasattr(e.retry_delay, 'seconds'):
+                        retry_delay = float(e.retry_delay.seconds)
+                
+                # Eğer bulamadıysak, exception mesajından parse etmeye çalış
+                if retry_delay == 30:
+                    import re
+                    error_str = str(e)
+                    # "Please retry in 46.96s" formatını yakala
+                    match = re.search(r'retry in (\d+(?:\.\d+)?)s', error_str, re.IGNORECASE)
+                    if match:
+                        retry_delay = float(match.group(1))
+                    else:
+                        # "retry_delay { seconds: 46 }" formatını yakala
+                        match = re.search(r'retry_delay.*?seconds.*?(\d+(?:\.\d+)?)', error_str, re.IGNORECASE)
+                        if match:
+                            retry_delay = float(match.group(1))
+                
+                if attempt < max_retries - 1:
+                    print(f"[BaseArchitectAgent] Quota exceeded (attempt {attempt + 1}/{max_retries}). Waiting {retry_delay:.1f}s before retry...")
+                    time.sleep(retry_delay)
+                else:
+                    # Son deneme de başarısız oldu
+                    raise ConnectionError(
+                        f"Gemini API quota exceeded after {max_retries} attempts. "
+                        f"Please wait and try again later. Last error: {e}"
+                    )
+                    
+            except Exception as e:
+                # JSON parse hatası veya diğer hatalar için retry yapma
+                if "JSON" in str(e) or "parse" in str(e).lower():
+                    raise  # JSON parse hatası için direkt fırlat
+                # Diğer hatalar için de direkt fırlat
+                raise ConnectionError(f"LLM API call failed: {e}")
+        
+        # Buraya gelmemeli ama güvenlik için
+        if last_exception:
+            raise ConnectionError(f"LLM API call failed after {max_retries} attempts: {last_exception}")
+        raise ConnectionError("Unexpected error in llm_json")
