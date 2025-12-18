@@ -80,37 +80,17 @@ class ViewArchitectAgent(BaseArchitectAgent):
     def _build_view_prompt(self, chunks: List[str]) -> str:
         """
         Builds clean and minimal prompt for extracting VIEW layer.
-        (Mevcut prompt yapısı korunmuştur.)
         """
 
         context = ""
         for i, c in enumerate(chunks):
             context += f"\n\n--- SRS Chunk {i+1} ---\n{c}\n"
 
-        return f"""
-You are a senior UI/UX architect.
-Extract ONLY the names of SCREENS / PAGES described in the SRS.
-
-### VERY IMPORTANT RULES:
-- Each view has ONLY:
-    - name
-    - short description
-- DO NOT include UI widgets.
-- DO NOT include buttons, sliders, forms, inputs.
-- DO NOT include navigation information.
-- DO NOT include user roles.
-- DO NOT include components.
-- KEEP THE OUTPUT MINIMAL.
-
-### STRICT JSON FORMAT (NO COMMENTS, NO EXTRA TEXT):
-{{
-  "view": [
-    {{"name": "ScreenName", "description": "Short description."}}
-  ]
-}}
-
-### SRS CONTEXT:
-{context}
-
-Return ONLY the JSON. No explanation.
-"""
+        # Load prompt from external file
+        prompt_path = Path(__file__).resolve().parents[3] / ".github" / "prompts" / "extract_view_architecture.prompt.md"
+        prompt_template = prompt_path.read_text(encoding="utf-8")
+        
+        # Replace variables in template
+        prompt = prompt_template.replace("{{context}}", context)
+        
+        return prompt

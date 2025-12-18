@@ -4,14 +4,18 @@ from typing import Dict, Any, List
 from pathlib import Path
 import re 
 
-# BaseArchitectAgent'tan miras alıyoruz (data_dir özelliği için)
-from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent 
-
-class RulesAgent(BaseArchitectAgent):
+class RulesAgent:
     """
     Deterministically detects specific MVC violations and structural inconsistencies 
     using the Python AST library and file system checks.
     """
+    
+    def __init__(self, rag_pipeline=None, llm_client=None):
+        """Initialize RulesAgent. Parameters kept for compatibility but not used."""
+        # Only need data_dir, no need for BaseArchitectAgent inheritance
+        project_root = Path(__file__).resolve().parents[2]
+        self.data_dir = project_root / "data"
+        self.data_dir.mkdir(exist_ok=True)
     
     def _load_architecture(self) -> Dict[str, Any]:
             """
@@ -46,19 +50,88 @@ class RulesAgent(BaseArchitectAgent):
     def detect_violations(self, scaffold_root: Path) -> List[Dict[str, str]]:
         """
         Main entry point for deterministic rules checking. 
-        SADECE MİMARİ İHLALLERİNE ODAKLANILIR.
+        Directly scans files using regex - does not require architecture_map.json.
         """
-        architecture = self._load_architecture()
         violations = []
         
-        # KRİTİK CHECK: Tüm temel MVC bağımlılık kurallarını denetle
-        violations.extend(self._check_mvc_dependency_violations(scaffold_root, architecture))
-        
-        # Naming Convention (Dosya adı ihlalleri) kontrolü kaldırılmıştır.
+        # Direct file scanning - no architecture map needed
+        violations.extend(self._check_mvc_dependency_violations_direct(scaffold_root))
         
         return violations
 
     # PEP 8 İsimlendirme kontrol metotları (_check_naming_conventions) tamamen kaldırıldı.
+
+    def _check_mvc_dependency_violations_direct(self, root: Path) -> List[Dict[str, str]]:
+        """
+        Directly scans files using regex to detect MVC violations.
+        Does not require architecture_map.json.
+        """
+        violations = []
+        
+        # Regex patterns for detecting layer violations
+        models_pattern = re.compile(r'from\s+.*\.views\.|import\s+.*\.views\.|from\s+.*views\.|import\s+.*views\.', re.IGNORECASE)
+        models_pattern_controller = re.compile(r'from\s+.*\.controllers\.|import\s+.*\.controllers\.|from\s+.*controllers\.|import\s+.*controllers\.', re.IGNORECASE)
+        views_pattern_model = re.compile(r'from\s+.*\.models\.|import\s+.*\.models\.|from\s+.*models\.|import\s+.*models\.', re.IGNORECASE)
+        
+        for file_path in root.rglob("*.py"):
+            try:
+                content = file_path.read_text(encoding="utf-8")
+                
+                # Determine layer from file path
+                file_str = str(file_path).replace('\\', '/')
+                layer = None
+                if '/models/' in file_str or '\\models\\' in file_str:
+                    layer = 'Model'
+                elif '/controllers/' in file_str or '\\controllers\\' in file_str:
+                    layer = 'Controller'
+                elif '/views/' in file_str or '\\views\\' in file_str:
+                    layer = 'View'
+                
+                if not layer:
+                    continue
+                
+                # Check for violations using regex
+                if layer == 'Model':
+                    # Model importing View
+                    if models_pattern.search(content):
+                        violations.append({
+                            "type": "MVC_M_V_VIOLATION",
+                            "file": str(file_path),
+                            "message": f"CRITICAL: Model imports View. Found import statement containing 'views' in {file_path.name}",
+                        })
+                    # Model importing Controller
+                    if models_pattern_controller.search(content):
+                        violations.append({
+                            "type": "MVC_M_C_VIOLATION",
+                            "file": str(file_path),
+                            "message": f"CRITICAL: Model imports Controller. Found import statement containing 'controllers' in {file_path.name}",
+                        })
+                
+                elif layer == 'View':
+                    # View importing Model directly
+                    if views_pattern_model.search(content):
+                        violations.append({
+                            "type": "MVC_V_M_VIOLATION",
+                            "file": str(file_path),
+                            "message": f"WARNING: View imports Model directly. Found import statement containing 'models' in {file_path.name}",
+                        })
+                
+            except SyntaxError as se:
+                violations.append({
+                    "type": "SYNTAX_ERROR",
+                    "file": str(file_path),
+                    "message": f"CRITICAL: Syntax error in file (line {se.lineno}): {se.msg}",
+                })
+                continue
+            except Exception as e:
+                violations.append({
+                    "type": "PARSE_ERROR",
+                    "file": str(file_path),
+                    "message": f"WARNING: Failed to parse file: {str(e)}",
+                })
+                continue
+        
+        return violations
 
     def _check_mvc_dependency_violations(self, root: Path, architecture: Dict[str, Any]) -> List[Dict[str, str]]:
         """
@@ -81,7 +154,6 @@ class RulesAgent(BaseArchitectAgent):
                 content = file_path.read_text(encoding="utf-8")
                 tree = ast.parse(content)
                 
-                # Dosyanın hangi katmana ait olduğunu belirle
                 layer = None
                 if models_dir_name in str(file_path):
                     layer = 'Model'
@@ -94,19 +166,29 @@ class RulesAgent(BaseArchitectAgent):
                 
                 for node in ast.walk(tree):
                     if isinstance(node, ast.ImportFrom) or isinstance(node, ast.Import):
-                        import_target = node.module or ', '.join([n.name for n in node.names])
+                        # Get import target
+                        if isinstance(node, ast.ImportFrom):
+                            import_target = node.module or ''
+                            imported_names = [n.name for n in node.names]
+                        else:  # ast.Import
+                            import_target = ', '.join([n.name for n in node.names])
+                            imported_names = [n.name for n in node.names]
                         
                         # --- 1. Model Katmanı İhlalleri (MVC-M-00x) ---
                         if layer == 'Model':
                             # Kural M-001: Model, Controller import edemez
-                            if controllers_dir_name in import_target.lower() or any(ctrl_name in import_target for ctrl_name in expected_controllers):
+                            if (controllers_dir_name in import_target.lower() or 
+                                any(ctrl_name.lower() in import_target.lower() for ctrl_name in expected_controllers) or
+                                any(ctrl_name.lower() in name.lower() for ctrl_name in expected_controllers for name in imported_names)):
                                 violations.append({
                                     "type": "MVC_M_C_VIOLATION",
                                     "file": str(file_path),
                                     "message": f"CRITICAL: Model imports Controller logic/class ({import_target}). Models must be independent of higher layers (MVC-M-001).",
                                 })
                             # Kural M-002: Model, View import edemez
-                            if views_dir_name in import_target.lower() or any(view_name in import_target for view_name in expected_views):
+                            if (views_dir_name in import_target.lower() or 
+                                any(view_name.lower() in import_target.lower() for view_name in expected_views) or
+                                any(view_name.lower() in name.lower() for view_name in expected_views for name in imported_names)):
                                 violations.append({
                                     "type": "MVC_M_V_VIOLATION",
                                     "file": str(file_path),
@@ -131,16 +213,32 @@ class RulesAgent(BaseArchitectAgent):
                             # Bu kuralı eklemeye gerek yok, bu bir ihlal değildir.
                             
                             # Kural V-002: View, doğrudan Model import etmemelidir (Controller üzerinden dolaylı olmalıdır).
-                            # Ancak basit MVC'de bu bazen hoş görülür, kuralı sıkı tutalım.
-                            if models_dir_name in import_target.lower() and not any(model_name in import_target for model_name in expected_models):
-                                # Sadece klasör adını import etmeyi yakala
+                            # Basit MVC'de bu bazen hoş görülür ama ideal değildir.
+                            if (models_dir_name in import_target.lower() or 
+                                any(model_name.lower() in import_target.lower() for model_name in expected_models) or
+                                any(model_name.lower() in name.lower() for model_name in expected_models for name in imported_names)):
                                 violations.append({
                                     "type": "MVC_V_M_VIOLATION",
                                     "file": str(file_path),
                                     "message": f"WARNING: View imports Model directly ({import_target}). Data flow should ideally be orchestrated by the Controller (MVC-V-002).",
                                 })
                                 
+            except SyntaxError as se:
+                # Syntax errors should be reported as violations
+                violations.append({
+                    "type": "SYNTAX_ERROR",
+                    "file": str(file_path),
+                    "message": f"CRITICAL: Syntax error in file (line {se.lineno}): {se.msg}. File may be corrupted or contain invalid Python code.",
+                })
+                print(f"[AST ERROR] Failed to parse file {file_path}: {se}")
+                continue
             except Exception as e:
+                # Other parsing errors
+                violations.append({
+                    "type": "PARSE_ERROR",
+                    "file": str(file_path),
+                    "message": f"WARNING: Failed to parse file: {str(e)}. File may be corrupted.",
+                })
                 print(f"[AST ERROR] Failed to parse file {file_path}: {e}")
                 continue
 

@@ -6,6 +6,7 @@ import sys
 
 # Agent'ın miras aldığı Base Agent'ı import edin. 
 from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent
+from src.core.llm_client import QuotaExceededError, LLMConnectionError
 
 class SRSWriterAgent(BaseArchitectAgent):
     """
@@ -15,8 +16,7 @@ class SRSWriterAgent(BaseArchitectAgent):
     def __init__(self, rag_pipeline=None, llm_client=None):
         # BaseArchitectAgent'ın __init__ metodunu çağırır. 
         super().__init__(rag_pipeline, llm_client)
-        # RAG nesnesine erişimi Orchestrator için kolaylaştırır.
-        self.rag_pipeline = rag_pipeline 
+        # self.rag already exists from BaseArchitectAgent, no need for duplicate 
 
     
     def generate_srs(self, user_idea: str) -> Path:
@@ -24,32 +24,42 @@ class SRSWriterAgent(BaseArchitectAgent):
         Instructs the LLM to generate the SRS document, saves the output to the data/ folder, 
         and returns the file path.
         """
+        import time
         
-        prompt = f"""
-        You are an expert Software Requirements Analyst. Based on the user's high-level idea, 
-        you must generate a detailed, technical SRS (Software Requirements Specification) document.
-
-        The SRS document MUST include the following sections:
-        1. Introduction and Purpose
-        2. Functional Requirements (Including user stories)
-        3. Non-Functional Requirements (Security, Performance, Usability)
-        4. Data Model and Entities (Crucial for Model architecture)
-
-        User Idea: "{user_idea}"
-
-        Return ONLY the requirements text, including the sections and their content. Do not add any introductory or concluding remarks.
-        """
+        # Load prompt from external file
+        prompt_path = Path(__file__).resolve().parents[2] / ".github" / "prompts" / "create_srs.prompt.md"
+        prompt_template = prompt_path.read_text(encoding="utf-8")
+        
+        # Replace variables in template
+        prompt = prompt_template.replace("{{user_idea}}", user_idea)
         
         # KODLAMA HATASINI ÖNLEMEK İÇİN LOG MESAJI SADELEŞTİRİLDİ (İngilizce ve Emojisiz)
-        print("[SRS Writer] Generating SRS text...") 
+        print("[SRS Writer] Generating SRS text...")
+        print(f"⏱️  Estimated time: ~15-30 seconds")
+        
+        start_time = time.time()
         
         try:
-            srs_text = self.llm.generate_content(prompt) 
+            srs_text = self.llm.generate_content(prompt, stream=False)  # stream=False for faster response
+            elapsed = time.time() - start_time
+            print(f"✓ Generated in {elapsed:.1f}s") 
 
+        except QuotaExceededError as qe:
+            # Kota doldu - pipeline'ı çökertme, kullanıcıya net mesaj ver
+            print(f"\n{str(qe)}")
+            print("[SRS Writer] Pipeline stopped gracefully. Please try again later.")
+            raise  # Exception'ı yukarı fırlat (CLI catch etsin)
+            
+        except LLMConnectionError as lce:
+            # Bağlantı hatası
+            print(f"\n[SRS Writer ERROR] LLM connection failed: {lce}")
+            print("[SRS Writer] Pipeline stopped. Check your network/API key.")
+            raise
+            
         except Exception as e:
-            # Hata mesajı İngilizce ve sadeleştirildi
-            print(f"[SRS Writer ERROR] Failed to get response from LLM: {e}")
-            sys.exit(1)
+            # Diğer beklenmeyen hatalar
+            print(f"[SRS Writer ERROR] Unexpected error: {e}")
+            raise
 
 
         # Dosya yolu oluşturma

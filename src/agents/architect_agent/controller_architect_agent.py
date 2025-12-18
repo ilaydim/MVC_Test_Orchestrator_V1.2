@@ -84,41 +84,17 @@ class ControllerArchitectAgent(BaseArchitectAgent):
     def _build_controller_prompt(self, chunks: List[str]) -> str:
         """
         Builds clean and minimal prompt for extracting CONTROLLER layer.
-        (Mevcut prompt yapısı korunmuştur, sadece bağlamı iyileşmiştir.)
         """
 
         context = ""
         for i, c in enumerate(chunks):
             context += f"\n\n--- SRS Chunk {i+1} ---\n{c}\n"
 
-        return f"""
-You are a backend software architect.
-Extract ONLY the CONTROLLERS and their ACTIONS.
-
-### VERY IMPORTANT RULES:
-- Each controller has:
-    - name  (e.g., "UserController")
-    - actions (list of strings, e.g. ["login", "register"])
-- DO NOT include inputs, outputs, parameters.
-- DO NOT include descriptions of actions.
-- DO NOT include next views.
-- DO NOT include model operations.
-- DO NOT infer CRUD automatically unless SRS clearly defines it.
-- KEEP THE OUTPUT MINIMAL.
-- NO repetition of controller names.
-
-### STRICT JSON FORMAT (NO COMMENTS, NO EXTRA TEXT):
-{{
-  "controller": [
-    {{
-      "name": "SomeController",
-      "actions": ["actionOne", "actionTwo"]
-    }}
-  ]
-}}
-
-### SRS CONTEXT:
-{context}
-
-Return ONLY the JSON. No explanation.
-"""
+        # Load prompt from external file
+        prompt_path = Path(__file__).resolve().parents[3] / ".github" / "prompts" / "extract_controller_architecture.prompt.md"
+        prompt_template = prompt_path.read_text(encoding="utf-8")
+        
+        # Replace variables in template
+        prompt = prompt_template.replace("{{context}}", context)
+        
+        return prompt

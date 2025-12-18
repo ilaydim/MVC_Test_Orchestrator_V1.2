@@ -22,12 +22,8 @@ class ReviewerAgent(BaseArchitectAgent):
                 "recommendations": []
             }
         else:
-            # LLM'e göndereceğimiz teknik veriyi string'e çevirelim
             violations_str = json.dumps(technical_violations, indent=2)
             prompt = self._build_reviewer_prompt(violations_str)
-            
-            # Gemini API'yi kullanarak raporu JSON formatında alalım
-            # NOTE: LLM'den hem raporu hem de özeti JSON formatında istemek en verimli yoldur.
             report_json = self.llm_json(prompt)
             
             report = {
@@ -36,7 +32,6 @@ class ReviewerAgent(BaseArchitectAgent):
                 "recommendations": report_json.get("recommendations", [])
             }
 
-        # Nihai raporu kaydedelim
         self.save_output(report, "final_audit_report.json")
         return report
 

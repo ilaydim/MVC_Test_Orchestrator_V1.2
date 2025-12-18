@@ -47,6 +47,9 @@ class MVCScaffolder:
         """
         Creates model, view, and controller skeleton files based on
         the provided architecture map.
+        
+        This is a rule-based operation (no LLM). Only reads architecture_map.json
+        and creates empty .py files in scaffolds/mvc_skeleton/.
 
         Returns:
             {
@@ -55,6 +58,15 @@ class MVCScaffolder:
               "controllers": [Path(...), ...]
             }
         """
+        # Validate architecture structure
+        if not isinstance(architecture, dict):
+            raise ValueError(f"Invalid architecture: expected dict, got {type(architecture)}")
+        
+        required_keys = ["model", "view", "controller"]
+        missing_keys = [key for key in required_keys if key not in architecture]
+        if missing_keys:
+            raise ValueError(f"Missing required architecture keys: {missing_keys}")
+        
         self._ensure_base_dirs()
 
         created_models = self._scaffold_models(architecture.get("model", []))

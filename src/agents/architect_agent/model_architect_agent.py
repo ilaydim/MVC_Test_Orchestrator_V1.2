@@ -77,29 +77,11 @@ class ModelArchitectAgent(BaseArchitectAgent):
         for i, c in enumerate(chunks):
             context += f"\n\n--- SRS Chunk {i+1} ---\n{c}\n"
 
-        return f"""
-You are a senior software architect specialized in high-level domain modeling.
-Extract ONLY the *domain entities* from the SRS.
-
-### VERY IMPORTANT RULES:
-- ONLY output entity names and a short description.
-- DO NOT include attributes.
-- DO NOT include fields.
-- DO NOT include database schemas.
-- DO NOT include relationships.
-- DO NOT infer extra fields.
-- DO NOT include UI, controller, or workflow descriptions.
-- KEEP THE OUTPUT MINIMAL.
-
-### STRICT JSON FORMAT (NO COMMENTS, NO EXTRA TEXT):
-{{
-  "model": [
-    {{"name": "EntityName", "description": "Short description."}}
-  ]
-}}
-
-### SRS CONTEXT:
-{context}
-
-Return ONLY the JSON. No explanation.
-"""
+        # Load prompt from external file
+        prompt_path = Path(__file__).resolve().parents[3] / ".github" / "prompts" / "extract_model_architecture.prompt.md"
+        prompt_template = prompt_path.read_text(encoding="utf-8")
+        
+        # Replace variables in template
+        prompt = prompt_template.replace("{{context}}", context)
+        
+        return prompt

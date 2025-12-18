@@ -1,4 +1,55 @@
 # src/rag/rag_pipeline.py
+# Disable telemetry to prevent crashes - AGGRESSIVE APPROACH
+import os
+import sys
+import contextlib
+from io import StringIO
+
+# Disable telemetry environment variables (multiple ways)
+os.environ['ANONYMIZED_TELEMETRY'] = 'False'
+os.environ['CHROMA_TELEMETRY_DISABLED'] = 'True'
+os.environ['CHROMA_TELEMETRY_ENABLED'] = 'False'
+os.environ['DO_NOT_TRACK'] = '1'
+
+# Suppress stderr for telemetry errors (temporary redirect)
+class TelemetrySuppressor:
+    """Context manager to suppress telemetry errors from stderr"""
+    def __init__(self):
+        self.original_stderr = sys.stderr
+        self.suppressed_stderr = StringIO()
+    
+    def __enter__(self):
+        sys.stderr = self.suppressed_stderr
+        return self
+    
+    def __exit__(self, *args):
+        sys.stderr = self.original_stderr
+        # Check if error was telemetry-related
+        error_text = self.suppressed_stderr.getvalue()
+        if error_text and ('telemetry' not in error_text.lower() and 'capture' not in error_text.lower()):
+            # If it's not a telemetry error, print it
+            self.original_stderr.write(error_text)
+
+# Monkey-patch telemetry to suppress errors
+try:
+    import chromadb.telemetry.events as telemetry_events
+    original_capture = getattr(telemetry_events, 'capture', None)
+    if original_capture:
+        def silent_capture(*args, **kwargs):
+            # Silently ignore ALL telemetry calls
+            return None
+        telemetry_events.capture = silent_capture
+except:
+    pass  # If telemetry module doesn't exist, continue
+
+# Also try to patch posthog if it exists
+try:
+    import posthog
+    # Disable posthog telemetry
+    posthog.capture = lambda *args, **kwargs: None
+except:
+    pass
+
 from pathlib import Path
 
 import pdfplumber
@@ -7,6 +58,13 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chromadb.utils import embedding_functions
 import chromadb
 from chromadb import Client
+
+# Try to import Settings, fallback if not available
+try:
+    from chromadb.config import Settings
+    HAS_SETTINGS = True
+except ImportError:
+    HAS_SETTINGS = False
 
 from src.core.config import (
     COLLECTION_NAME,
@@ -100,7 +158,23 @@ class Embedder:
 # -----------------------------
 class VectorStore:
     def __init__(self, collection_name: str, embedding_function):
-        self.client = Client()
+        # Create client with telemetry disabled
+        try:
+            if HAS_SETTINGS:
+                # Try to create client with settings that disable telemetry
+                settings = Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True,
+                )
+                self.client = Client(settings=settings)
+            else:
+                # Fallback: create client normally
+                self.client = Client()
+        except Exception as e:
+            # If settings fail, create client normally
+            # Telemetry errors will be caught in try-except blocks
+            self.client = Client()
+        
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
             embedding_function=embedding_function,
@@ -113,15 +187,46 @@ class VectorStore:
             for i in range(len(chunks))
         ]
 
-        self.collection.add(ids=ids, documents=chunks, metadatas=metadatas)
+        # Use telemetry suppressor to hide stderr errors
+        with TelemetrySuppressor():
+            try:
+                self.collection.add(ids=ids, documents=chunks, metadatas=metadatas)
+            except Exception as e:
+                # Ignore telemetry errors, continue with operation
+                if "telemetry" in str(e).lower() or "capture" in str(e).lower():
+                    # Try again - telemetry already suppressed
+                    try:
+                        self.collection.add(ids=ids, documents=chunks, metadatas=metadatas)
+                    except:
+                        pass  # Continue anyway
+                else:
+                    raise  # Re-raise if it's not a telemetry error
         return len(ids)
 
     def query(self, text, k: int = DEFAULT_TOP_K):
-        return self.collection.query(
-            query_texts=[text],
-            n_results=k,
-            include=["documents"],
-        )
+        # Use telemetry suppressor to hide stderr errors
+        with TelemetrySuppressor():
+            try:
+                return self.collection.query(
+                    query_texts=[text],
+                    n_results=k,
+                    include=["documents"],
+                )
+            except Exception as e:
+                # Ignore telemetry errors, continue with operation
+                if "telemetry" in str(e).lower() or "capture" in str(e).lower():
+                    # Try again - telemetry already suppressed
+                    try:
+                        return self.collection.query(
+                            query_texts=[text],
+                            n_results=k,
+                            include=["documents"],
+                        )
+                    except:
+                        # Return empty result if telemetry keeps failing
+                        return {"documents": [[]]}
+                else:
+                    raise  # Re-raise if it's not a telemetry error
 
     def count(self):
         return self.collection.count()
@@ -163,7 +268,8 @@ class RAGPipeline:
         Bu metod, Orchestrator'ın çağırdığı tek indexleme metodudur.
         """
         
-        file_path = Path(file_path) # Path objesi olduğunu garanti edelim
+        # Normalize path to handle Windows backslashes
+        file_path = Path(str(file_path)).resolve()
         
         if file_path.suffix.lower() == '.pdf':
             # PDF işleme mantığı

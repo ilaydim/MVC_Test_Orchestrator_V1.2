@@ -62,32 +62,17 @@ class RequirementsAgent(BaseArchitectAgent):
         """
         Builds the detailed LLM prompt for extracting structured requirements.
         """
+        from pathlib import Path
+        
         context = ""
         for i, c in enumerate(chunks):
             context += f"\n\n--- SRS Chunk {i+1} ---\n{c}\n"
 
-        json_schema = self._get_json_schema_definition()
-        json_schema_str = json.dumps(json_schema, indent=2)
-
-        return f"""
-You are a Requirements Engineer AI. Your task is to analyze the provided SRS context
-and extract the high-level domain structure required for an MVC application.
+        # Load prompt from external file
+        prompt_path = Path(__file__).resolve().parents[3] / ".github" / "prompts" / "extract_requirements.prompt.md"
+        prompt_template = prompt_path.read_text(encoding="utf-8")
         
-### GOAL:
-Extract ALL fundamental domain entities (Model layer) and ALL high-level
-system functionalities/workflows (Controller layer).
+        # Replace variables in template
+        prompt = prompt_template.replace("{{context}}", context)
         
-### VERY IMPORTANT RULES:
-- The output MUST strictly adhere to the provided JSON Schema.
-- Entities should focus on *data* that needs to be stored or managed (e.g., User, Product).
-- System Functions should focus on *actions* the system performs (e.g., registerUser, updateStock).
-- DO NOT invent entities or functions. Extract ONLY what is clearly mentioned or implied in the context.
-        
-### STRICT JSON FORMAT (NO COMMENTS, NO EXTRA TEXT, NO CODE FENCES):
-{json_schema_str}
-        
-### SRS CONTEXT:
-{context}
-
-Return ONLY the JSON. No explanation, no introduction.
-"""
+        return prompt

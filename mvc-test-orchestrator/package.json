@@ -11,60 +11,79 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:mvc-test-orchestrator.createSrsAndExtract",
-    "onCommand:mvc-test-orchestrator.indexSrsAndExtract",
-    "onCommand:mvc-test-orchestrator.generateScaffold",
-    "onCommand:mvc-test-orchestrator.runAudit", 
-    "onCommand:mvc-test-orchestrator.runCode",
-    "onView:mvcArchitectureView"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "mvc-test-orchestrator.mvc",
+        "name": "mvc",
+        "description": "MVC Test Orchestrator - AI-powered MVC architecture generator",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "create-srs",
+            "description": "Create SRS from project idea (interactive Q&A)"
+          },
+          {
+            "name": "upload-srs",
+            "description": "Upload existing SRS file"
+          },
+          {
+            "name": "extract",
+            "description": "Extract MVC architecture from SRS (Architect Agent only)"
+          },
+          {
+            "name": "scaffold",
+            "description": "Generate scaffold files (Scaffolder Agent only, no LLM)"
+          },
+          {
+            "name": "generate",
+            "description": "Generate implementation code (Coder Agents only)"
+          },
+          {
+            "name": "code",
+            "description": "[LEGACY] Alias for generate command"
+          },
+          {
+            "name": "audit",
+            "description": "Run quality audit (Rules & Reviewer Agents only)"
+          },
+          {
+            "name": "fix",
+            "description": "Automatically apply audit recommendations"
+          }
+        ]
+      }
+    ],
     "commands": [
-{
+      {
         "command": "mvc-test-orchestrator.createSrsAndExtract",
-        "title": "MVC: 1a. Create SRS (from idea) - Step 1",
-        "category": "MVC Orchestrator"
+        "title": "✨ Use @mvc in Copilot Chat instead → Create SRS",
+        "category": "MVC Orchestrator (Legacy)"
       },
       {
         "command": "mvc-test-orchestrator.indexSrsAndExtract",
-        "title": "MVC: 1b. Extract Architecture from SRS - Step 2",
-        "category": "MVC Orchestrator"
+        "title": "✨ Use @mvc in Copilot Chat instead → Extract Architecture",
+        "category": "MVC Orchestrator (Legacy)"
       },
       {
         "command": "mvc-test-orchestrator.generateScaffold",
-        "title": "MVC: 2. Generate Scaffold",
-        "category": "MVC Orchestrator"
+        "title": "✨ Use @mvc in Copilot Chat instead → Generate Scaffold",
+        "category": "MVC Orchestrator (Legacy)"
       },
       { 
         "command": "mvc-test-orchestrator.runCode",
-        "title": "MVC: 3. Generate Code Logic (Coder Agent)",
-        "category": "MVC Orchestrator"
-
+        "title": "✨ Use @mvc in Copilot Chat instead → Generate Code",
+        "category": "MVC Orchestrator (Legacy)"
       },
       {
         "command": "mvc-test-orchestrator.runAudit",
-        "title": "MVC: 4. Run Quality Audit (Rules & Reviewer)",
-        "category": "MVC Orchestrator"
+        "title": "✨ Use @mvc in Copilot Chat instead → Run Audit",
+        "category": "MVC Orchestrator (Legacy)"
       }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "mvcArchitectureContainer",
-          "title": "MVC",
-          "icon": "resources/mvc-icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "mvcArchitectureContainer": [
-        {
-          "id": "mvcArchitectureView",
-          "name": "📦 MVC Architecture"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "test": "mocha -r ts-node/register src/test/**/*.ts",
