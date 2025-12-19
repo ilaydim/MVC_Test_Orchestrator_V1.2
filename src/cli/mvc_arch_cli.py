@@ -4,7 +4,9 @@ os.environ['ANONYMIZED_TELEMETRY'] = 'False'
 
 import argparse
 import json
+import re
 import sys
+import time
 import traceback
 from pathlib import Path
 
@@ -17,9 +19,6 @@ from src.agents.architect_agent.requirements_agent import RequirementsAgent
 from src.agents.architect_agent.model_architect_agent import ModelArchitectAgent
 from src.agents.architect_agent.view_architect_agent import ViewArchitectAgent
 from src.agents.architect_agent.controller_architect_agent import ControllerArchitectAgent
-from src.agents.model_coder_agent import ModelCoderAgent
-from src.agents.view_coder_agent import ViewCoderAgent
-from src.agents.controller_coder_agent import ControllerCoderAgent
 from src.agents.rules_agent import RulesAgent
 from src.agents.reviewer_agent import ReviewerAgent
 
@@ -31,7 +30,6 @@ def _run_extraction_pipeline(
 ):
     """Common architecture extraction logic. MODULAR: Only Architect Agent, writes to disk only."""
 
-    # 1) Bağımlılıkları Başlat
     print("[INFO] Initializing RAG and LLM Clients...")
     try:
         llm_client = LLMClient()
@@ -41,7 +39,6 @@ def _run_extraction_pipeline(
         traceback.print_exc(file=sys.stdout)
         sys.exit(1)
 
-    # 2) Initialize SRS Writer and Architect Agents (MODULAR: Only what's needed for extract)
     print("[INFO] Initializing SRS Writer and Architect Agents...")
     try:
         srs_writer = SRSWriterAgent(rag_pipeline, llm_client)
@@ -53,7 +50,6 @@ def _run_extraction_pipeline(
         print(f"[FATAL ERROR] Agent initialization failed: {e}")
         sys.exit(1)
 
-    # 3) SRS kaynağını belirle (user_idea veya mevcut SRS dosyası)
     current_srs_path: Path | None = None
 
     if user_idea:
@@ -61,10 +57,9 @@ def _run_extraction_pipeline(
         try:
             current_srs_path = srs_writer.generate_srs(user_idea)
         except QuotaExceededError as qe:
-            # Kota doldu - gracefully exit
             print(f"\n{str(qe)}")
             print("\n[CLI] Pipeline stopped. No files were modified.")
-            sys.exit(0)  # Normal exit (kota dolması fatal hata değil)
+            sys.exit(0)
         except LLMConnectionError as lce:
             print(f"\n[FATAL ERROR] LLM connection failed: {lce}")
             sys.exit(1)
@@ -87,14 +82,12 @@ def _run_extraction_pipeline(
         print("[FATAL ERROR] No output path provided for architecture JSON.")
         sys.exit(1)
 
-    # 4) Extract architecture (MODULAR: Direct agent calls, no wrapper)
     print(f"PHASE 0.5: Indexing SRS file: {current_srs_path.name}")
     rag_pipeline.index_srs(current_srs_path)
     
     print("PHASE 1-2: Extracting MVC Architecture (Extraction Only)...")
     from src.core.config import DEFAULT_TOP_K
     
-    # Run all architect agents directly (no orchestrator wrapper)
     requirements_analysis = requirements_agent.extract_analysis(k=DEFAULT_TOP_K)
     model_json = model_agent.extract_models(k=DEFAULT_TOP_K)
     controller_json = controller_agent.extract_controllers(k=DEFAULT_TOP_K)
@@ -106,7 +99,6 @@ def _run_extraction_pipeline(
         "controller": controller_json.get("controller", []),
     }
     
-    # Save output (using model_agent's save_output method)
     model_agent.save_output(architecture_map, "architecture_map.json")
     
     try:
@@ -126,9 +118,6 @@ def _run_extraction_pipeline(
     print(f"[SUCCESS] Extraction complete. JSON written to: {output_path_str}")
 
 
-# ---------------------------------------------------------
-# create-srs command
-# ---------------------------------------------------------
 def cmd_create_srs(args: argparse.Namespace) -> None:
     """Generate SRS from user idea."""
     try:
@@ -145,7 +134,6 @@ def cmd_create_srs(args: argparse.Namespace) -> None:
             traceback.print_exc(file=sys.stdout)
             sys.exit(1)
 
-        # 2) Initialize SRS Writer Agent
         print("[INFO] Initializing SRS Writer Agent...")
         try:
             srs_writer = SRSWriterAgent(rag_pipeline, llm_client)
@@ -154,14 +142,12 @@ def cmd_create_srs(args: argparse.Namespace) -> None:
             traceback.print_exc(file=sys.stdout)
             sys.exit(1)
 
-        # 3) Sadece SRS üret
         try:
             srs_path = srs_writer.generate_srs(user_idea)
         except QuotaExceededError as qe:
-            # Kota doldu - gracefully exit
             print(f"\n{str(qe)}")
             print("\n[CLI] SRS creation stopped. No files were created.")
-            sys.exit(0)  # Normal exit (kota dolması fatal hata değil)
+            sys.exit(0)
         except LLMConnectionError as lce:
             print(f"\n[FATAL ERROR] LLM connection failed: {lce}")
             traceback.print_exc(file=sys.stdout)
@@ -171,12 +157,10 @@ def cmd_create_srs(args: argparse.Namespace) -> None:
             traceback.print_exc(file=sys.stdout)
             sys.exit(1)
 
-        # 4) Üretilen SRS'i kullanıcı tarafından belirtilen yola taşı
         output_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             final_srs_path = srs_path.replace(output_path)
         except Exception:
-            # replace başarısız olursa kopyala
             content = srs_path.read_text(encoding="utf-8")
             output_path.write_text(content, encoding="utf-8")
             final_srs_path = output_path
@@ -194,9 +178,6 @@ def cmd_create_srs(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-# ---------------------------------------------------------
-# extract command (MODULAR: Only Architect Agent)
-# ---------------------------------------------------------
 def cmd_extract(args: argparse.Namespace) -> None:
     """Extract architecture from SRS. Only runs Architect Agent."""
     try:
@@ -226,9 +207,6 @@ def cmd_index_srs(args: argparse.Namespace) -> None:
     cmd_extract(args)
 
 
-# ---------------------------------------------------------
-# scaffold command (MODULAR: Only Scaffolder Agent)
-# ---------------------------------------------------------
 def cmd_scaffold(args: argparse.Namespace) -> None:
     """Generate scaffold files. Only runs Scaffolder Agent (no LLM)."""
     try:
@@ -321,9 +299,6 @@ def cmd_scaffold(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-# ---------------------------------------------------------
-# run-audit command
-# ---------------------------------------------------------
 def cmd_run_audit(args: argparse.Namespace) -> None:
     """Run quality audit. Only runs Rules & Reviewer Agents (scans generated_src/ for MVC violations)."""
     try:
@@ -336,16 +311,21 @@ def cmd_run_audit(args: argparse.Namespace) -> None:
                 print(f"[INFO] Continuing with direct file scanning (architecture_map.json not required).")
                 arch_path = None
         
+        # Get project root (CLI is in src/cli/, so parents[2] = project root)
+        project_root = Path(__file__).resolve().parents[2]
+        
         # Use default path if not provided
         if arch_path is None:
-            project_root = Path(__file__).resolve().parents[1]
             arch_path = project_root / "data" / "architecture_map.json"
             if not arch_path.exists():
                 print(f"[INFO] No architecture_map.json found. Using direct file scanning mode.")
-                # Create dummy path for orchestrator (it will use direct scanning)
+                # Create data directory if it doesn't exist
                 arch_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # 1) Initialize Rules & Reviewer Agents (MODULAR: Only what's needed for audit)
+        # Ensure data directory exists
+        data_dir = project_root / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        
         try:
             llm_client = LLMClient()
             rag_pipeline = RAGPipeline(llm_client=llm_client) 
@@ -356,37 +336,149 @@ def cmd_run_audit(args: argparse.Namespace) -> None:
             traceback.print_exc(file=sys.stdout)
             sys.exit(1)
         
-        # 2) Run audit (MODULAR: Direct file scanning)
         print("PHASE 5: Running Quality Audit (Independent)...")
+        print("[INFO] Scanning generated code files for violations...")
         
-        project_root = Path(__file__).resolve().parents[1]
         generated_root = project_root / "generated_src"
-        scaffold_root = project_root / "scaffolds" / "mvc_skeleton"
         
-        audit_root = None
-        if generated_root.exists() and any(generated_root.rglob("*.py")):
-            audit_root = generated_root
-            print(f"[INFO] Auditing generated code in: {generated_root}")
-        elif scaffold_root.exists() and any(scaffold_root.iterdir()):
-            audit_root = scaffold_root
-            print(f"[INFO] Auditing scaffold code in: {scaffold_root}")
-        else:
-            print("[ERROR] No code found to audit. Run scaffold and/or code generation first.")
-            return
+        if not generated_root.exists():
+            print(f"[ERROR] Generated code directory not found: {generated_root}")
+            print(f"[ERROR] Run '@mvc /generate_code' first to generate code.")
+            sys.exit(1)
         
-        # Direct file scanning - no architecture map needed
+        python_files = list(generated_root.rglob("*.py"))
+        if not python_files:
+            print(f"[ERROR] No Python files found in: {generated_root}")
+            print(f"[ERROR] Run '@mvc /generate_code' first to generate code.")
+            sys.exit(1)
+        
+        audit_root = generated_root
+        print(f"[INFO] Auditing generated code in: {generated_root}")
+        
+        # Check if previous report exists
+        output_file = data_dir / "final_audit_report.json"
+        previous_report_exists = output_file.exists()
+        if previous_report_exists:
+            print(f"[INFO] Previous audit report found. Will be updated with current code analysis.")
+        
+        python_files = list(audit_root.rglob("*.py"))
+        file_count = len(python_files)
+        print(f"[INFO] Analyzing {file_count} Python file(s) in current codebase...")
+        
+        print(f"[INFO] Step 1: Rules Agent detecting violations...")
         technical_violations = rules_agent.detect_violations(audit_root)
-        final_report = reviewer_agent.generate_audit_report(technical_violations)
+        print(f"[INFO] Found {len(technical_violations)} violation(s). Saved to violations.json")
         
-        output_file = arch_path.parent / "final_audit_report.json"
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(final_report, f, indent=4)
+        # Verify violations.json was created
+        violations_file = data_dir / "violations.json"
+        if violations_file.exists():
+            try:
+                with open(violations_file, "r", encoding="utf-8") as f:
+                    violations_data = json.load(f)
+                print(f"[INFO] Verified violations.json exists with {violations_data.get('total_count', 0)} violation(s)")
+            except Exception as e:
+                print(f"[WARN] Could not verify violations.json: {e}")
+        else:
+            print(f"[WARN] violations.json was not created at: {violations_file}")
+        
+        print(f"[INFO] Step 2: Reviewer Agent generating audit report from violations.json...")
+        
+        try:
+            final_report = reviewer_agent.generate_audit_report(technical_violations=None)
+        except QuotaExceededError as qe:
+            print(f"\n{str(qe)}")
+            print(f"\n[INFO] Audit report generation stopped due to quota limit.")
+            print(f"[INFO] Violations detected: {len(technical_violations)}")
+            print(f"[INFO] Check violations.json for details: {data_dir / 'violations.json'}")
+            sys.exit(0)
+        except LLMConnectionError as lce:
+            print(f"\n[FATAL ERROR] LLM connection failed: {lce}")
+            print(f"[INFO] Violations detected: {len(technical_violations)}")
+            print(f"[INFO] Check violations.json for details: {data_dir / 'violations.json'}")
+            traceback.print_exc(file=sys.stdout)
+            sys.exit(1)
+        except Exception as e:
+            print(f"[ERROR] ReviewerAgent failed: {e}")
+            print(f"[INFO] Violations detected: {len(technical_violations)}")
+            print(f"[INFO] Check violations.json for details: {data_dir / 'violations.json'}")
+            traceback.print_exc(file=sys.stdout)
+            sys.exit(1)
+        
+        # Verify report was generated
+        if not final_report:
+            print(f"[ERROR] ReviewerAgent returned empty report")
+            print(f"[INFO] Violations detected: {len(technical_violations)}")
+            print(f"[INFO] Check violations.json for details: {data_dir / 'violations.json'}")
+            sys.exit(1)
+        
+        print(f"[INFO] Report generated. Content keys: {list(final_report.keys())}")
+        print(f"[INFO] Report summary: {final_report.get('audit_summary', 'N/A')[:100]}")
+        
+        # Ensure data directory exists
+        data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save report to data directory (overwrites previous report if exists)
+        try:
+            print(f"[INFO] Saving audit report to: {output_file}")
+            print(f"[INFO] Report content size: {len(json.dumps(final_report))} bytes")
             
-        print(f"[SUCCESS] Audit report created: {output_file}")
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(final_report, f, indent=4, ensure_ascii=False)
+                f.flush()  # Force write to buffer
+                try:
+                    os.fsync(f.fileno())  # Force write to disk (Windows compatible)
+                except (OSError, AttributeError):
+                    # Some file systems don't support fsync
+                    pass
+            
+            # Wait a moment for file system to sync (Windows)
+            import time
+            time.sleep(0.5)
+            
+            # Verify file was written
+            if not output_file.exists():
+                print(f"[ERROR] File was not created: {output_file}")
+                sys.exit(1)
+            
+            file_size = output_file.stat().st_size
+            print(f"[INFO] File written. Size: {file_size} bytes")
+            
+            if file_size == 0:
+                print(f"[ERROR] File was written but is empty: {output_file}")
+                sys.exit(1)
+            
+            # Read back and verify content
+            try:
+                with open(output_file, "r", encoding="utf-8") as f:
+                    read_back = json.load(f)
+                if not read_back or len(str(read_back)) == 0:
+                    print(f"[ERROR] File content is empty after read-back")
+                    sys.exit(1)
+                print(f"[INFO] File content verified. Keys: {list(read_back.keys())}")
+            except json.JSONDecodeError as je:
+                print(f"[ERROR] File contains invalid JSON: {je}")
+                sys.exit(1)
+            except Exception as read_err:
+                print(f"[WARN] Could not verify file content: {read_err}")
+            
+            if previous_report_exists:
+                print(f"[SUCCESS] Audit report updated: {output_file}")
+                print(f"[INFO] Previous report has been replaced with current code analysis.")
+            else:
+                print(f"[SUCCESS] Audit report created: {output_file}")
+        except Exception as e:
+            print(f"[ERROR] Failed to save audit report: {e}")
+            print(f"[ERROR] Output file path: {output_file}")
+            print(f"[ERROR] Data directory exists: {data_dir.exists()}")
+            print(f"[ERROR] Data directory path: {data_dir}")
+            print(f"[ERROR] Data directory writable: {os.access(data_dir, os.W_OK) if data_dir.exists() else 'N/A'}")
+            traceback.print_exc(file=sys.stdout)
+            sys.exit(1)
         
         if final_report:
             print("[SUCCESS] Audit completed.")
-            print(f"Audit Report saved to: {arch_path.parent / 'final_audit_report.json'}")
+            print(f"Audit Report saved to: {output_file}")
+            print(f"[INFO] Report reflects current state of code. Re-run /audit after code changes to update.")
         else:
             print("[WARN] Audit completed but no report was generated.")
     except Exception as e:
@@ -402,75 +494,254 @@ def cmd_run_audit(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------
-# generate command (MODULAR: Only Coder Agents)
-# ---------------------------------------------------------
-def cmd_generate(args: argparse.Namespace) -> None:
-    """Generate code implementation. Only runs Coder Agents (reads from scaffolds/, writes to generated_src/)."""
-    # 1) Initialize Coder Agents (MODULAR: Only what's needed for code generation)
+def cmd_generate_code(args: argparse.Namespace) -> None:
+    """
+    Generate complete code for scaffold files using LLM.
+    Reads scaffold files, uses prompt templates, and generates real code.
+    """
     try:
-        llm_client = LLMClient()
-        rag_pipeline = RAGPipeline(llm_client=llm_client) 
-        model_coder = ModelCoderAgent(rag_pipeline, llm_client)
-        view_coder = ViewCoderAgent(rag_pipeline, llm_client)
-        controller_coder = ControllerCoderAgent(rag_pipeline, llm_client)
-    except Exception as e:
-        print(f"[FATAL ERROR] Agent initialization failed: {e}")
-        sys.exit(1)
-
-    # Parse arguments - category is required
-    category = getattr(args, 'category', None)
-    
-    if not category:
-        print(f"[ERROR] Category is required. Use: --category model|controller|view")
-        sys.exit(1)
-    
-    if category not in ['model', 'controller', 'view']:
-        print(f"[ERROR] Invalid category: {category}. Use: model, controller, or view")
-        sys.exit(1)
-    
-    # Validate scaffold exists
-    project_root = Path(__file__).resolve().parents[1]
-    scaffold_root = project_root / "scaffolds" / "mvc_skeleton"
-    category_dir = scaffold_root / f"{category}s"
-    
-    if not category_dir.exists() or not any(category_dir.glob("*.py")):
-        print(f"[ERROR] No scaffold files found in: {category_dir}")
-        print(f"[ERROR] Please run 'scaffold' command first to create skeleton files.")
-        sys.exit(1)
-    
-    # Use specialized coder agents - each processes ALL files in its category
-    # Coder agents read from scaffolds/ and write to generated_src/
-    try:
-        if category == 'model':
-            result = model_coder.generate_code()
-        elif category == 'controller':
-            result = controller_coder.generate_code()
-        elif category == 'view':
-            result = view_coder.generate_code()
+        category = args.category  # 'model', 'controller', or 'view'
+        category_plural = f"{category}s"
         
-        # Final summary
-        completed = len(result.get('completed', []))
-        failed = len(result.get('failed', []))
-        hallucinated = len(result.get('hallucinated', []))
+        # 1) Initialize LLM and RAG
+        print("[INFO] Initializing LLM Client...")
+        try:
+            llm_client = LLMClient()
+            rag_pipeline = RAGPipeline(llm_client=llm_client)
+        except Exception as e:
+            print(f"[FATAL ERROR] Client initialization failed: {e}")
+            traceback.print_exc(file=sys.stdout)
+            sys.exit(1)
         
-        print(f"\n{'='*60}")
-        print("[CODE GENERATION COMPLETE]")
-        print(f"{'='*60}")
-        print(f"✅ Completed: {completed} files")
-        if failed > 0:
-            print(f"❌ Failed: {failed} files")
-        if hallucinated > 0:
-            print(f"🚫 Hallucinated: {hallucinated} files")
-        print(f"{'='*60}\n")
+        # 2) Get project root (CLI is in src/cli/, so parents[2] = project root)
+        # Alternative: derive from arch_path (usually data/architecture_map.json)
+        arch_path = Path(str(args.arch_path)).resolve()
+        if not arch_path.exists():
+            print(f"[ERROR] Architecture JSON not found: {arch_path}")
+            sys.exit(1)
+        
+        # Try to get project root from arch_path first (more reliable)
+        # arch_path is usually data/architecture_map.json, so parent.parent = project root
+        if "data" in arch_path.parts:
+            project_root = arch_path.parent.parent  # data/architecture_map.json -> project root
+        else:
+            # Fallback: calculate from CLI file location
+            project_root = Path(__file__).resolve().parents[2]  # src/cli/mvc_arch_cli.py -> project root
+        
+        print(f"[INFO] Project root: {project_root}")
+        
+        # 3) Load architecture data
+        
+        with arch_path.open("r", encoding="utf-8") as f:
+            full_data = json.load(f)
+        
+        if "architecture" in full_data:
+            architecture = full_data["architecture"]
+        else:
+            architecture = full_data
+        
+        # 4) Load and index SRS for RAG (if not already indexed)
+        srs_path = project_root / "data" / "srs_document.txt"
+        srs_indexed = False
+        if srs_path.exists():
+            # Check if SRS is already indexed (collection has chunks)
+            try:
+                if rag_pipeline.vstore.count() == 0:
+                    print("[INFO] Indexing SRS for RAG retrieval...")
+                    rag_pipeline.index_srs(srs_path)
+                    srs_indexed = True
+                else:
+                    print("[INFO] SRS already indexed, using existing RAG index.")
+                    srs_indexed = True
+            except Exception as e:
+                print(f"[WARN] Could not index SRS: {e}")
+                print(f"[WARN] Will use limited SRS context (first 5000 chars)")
+                srs_indexed = False
+        
+        # 5) Get scaffold files
+        scaffold_dir = project_root / "scaffolds" / "mvc_skeleton" / category_plural
+        if not scaffold_dir.exists():
+            print(f"[ERROR] Scaffold directory not found: {scaffold_dir}")
+            print(f"[ERROR] Run 'scaffold' command first.")
+            sys.exit(1)
+        
+        scaffold_files = sorted([f for f in scaffold_dir.glob("*.py")])
+        if not scaffold_files:
+            print(f"[ERROR] No scaffold files found in {scaffold_dir}")
+            print(f"[ERROR] Run 'scaffold' command first.")
+            sys.exit(1)
+        
+        # 6) Load prompt template
+        prompt_template_path = project_root / ".github" / "prompts" / f"generate_{category}_code.prompt.md"
+        if not prompt_template_path.exists():
+            print(f"[ERROR] Prompt template not found: {prompt_template_path}")
+            sys.exit(1)
+        
+        prompt_template = prompt_template_path.read_text(encoding="utf-8")
+        
+        # 7) Create output directory structure
+        generated_src_root = project_root / "generated_src"
+        generated_dir = generated_src_root / category_plural
+        
+        try:
+            # First ensure generated_src root exists
+            generated_src_root.mkdir(parents=True, exist_ok=True)
+            print(f"[INFO] Created/verified generated_src root: {generated_src_root}")
             
-    except KeyboardInterrupt:
-        print(f"\n[CLI] ⚠️ Interrupted by user", flush=True)
-        sys.exit(130)  # Standard exit code for Ctrl+C
+            # Then create category subdirectory
+            generated_dir.mkdir(parents=True, exist_ok=True)
+            print(f"[INFO] Output directory: {generated_dir}")
+        except Exception as e:
+            print(f"[ERROR] Failed to create output directory: {generated_dir}")
+            print(f"[ERROR] Error: {e}")
+            sys.exit(1)
+        
+        # 8) Process each file
+        print(f"[INFO] Processing {len(scaffold_files)} {category} file(s)...")
+        
+        for idx, scaffold_file in enumerate(scaffold_files, 1):
+            fileName = scaffold_file.name
+            skeleton_content = scaffold_file.read_text(encoding="utf-8")
+            
+            # Extract class name from skeleton
+            class_match = re.search(r'class\s+(\w+)', skeleton_content)
+            className = class_match.group(1) if class_match else fileName.replace('.py', '')
+            
+            print(f"[{idx}/{len(scaffold_files)}] Generating code for: {fileName} (Class: {className})")
+            
+            # Find matching architecture item
+            arch_items = architecture.get(category, [])
+            arch_item = None
+            for item in arch_items:
+                item_name = item.get("name", "").lower()
+                if (item_name == className.lower() or 
+                    item_name.replace('view', '').replace('controller', '') == 
+                    className.lower().replace('view', '').replace('controller', '')):
+                    arch_item = item
+                    break
+            
+            if not arch_item and arch_items:
+                arch_item = arch_items[0]  # Fallback to first item
+            
+            # Get SRS context - use RAG for views/controllers, full text for models
+            srs_context = "SRS content not available."
+            if srs_path.exists():
+                if category == 'view' and srs_indexed:
+                    # For views, use RAG to get relevant SRS sections
+                    try:
+                        view_name = className.replace('View', '').replace('Screen', '').strip()
+                        query = f"user interface screen {view_name} display elements layout components"
+                        if arch_item and arch_item.get("description"):
+                            query += f" {arch_item.get('description')}"
+                        
+                        print(f"  → Retrieving relevant SRS sections for {className}...")
+                        from src.core.config import DEFAULT_TOP_K
+                        chunks = rag_pipeline.search(query, k=min(DEFAULT_TOP_K, 5))  # Get top 5 chunks
+                        if chunks and chunks.get("documents") and chunks["documents"][0]:
+                            srs_context = "\n\n".join(chunks["documents"][0])  # Combine chunks
+                            print(f"  → Retrieved {len(chunks['documents'][0])} relevant SRS chunks")
+                        else:
+                            # Fallback to full SRS (first 5000 chars)
+                            srs_context = srs_path.read_text(encoding="utf-8")[:5000]
+                            print(f"  → RAG returned no results, using first 5000 chars of SRS")
+                    except Exception as e:
+                        print(f"  → RAG retrieval failed: {e}, using full SRS (first 5000 chars)")
+                        srs_context = srs_path.read_text(encoding="utf-8")[:5000]
+                elif category == 'controller' and srs_indexed:
+                    # For controllers, use RAG to get relevant business logic sections
+                    try:
+                        controller_name = className.replace('Controller', '').strip()
+                        query = f"business logic {controller_name} actions operations workflow"
+                        if arch_item and arch_item.get("actions"):
+                            actions_str = " ".join(arch_item.get("actions", [])[:3])
+                            query += f" {actions_str}"
+                        
+                        print(f"  → Retrieving relevant SRS sections for {className}...")
+                        from src.core.config import DEFAULT_TOP_K
+                        chunks = rag_pipeline.search(query, k=min(DEFAULT_TOP_K, 5))
+                        if chunks and chunks.get("documents") and chunks["documents"][0]:
+                            srs_context = "\n\n".join(chunks["documents"][0])
+                            print(f"  → Retrieved {len(chunks['documents'][0])} relevant SRS chunks")
+                        else:
+                            srs_context = srs_path.read_text(encoding="utf-8")[:5000]
+                            print(f"  → RAG returned no results, using first 5000 chars of SRS")
+                    except Exception as e:
+                        print(f"  → RAG retrieval failed: {e}, using full SRS (first 5000 chars)")
+                        srs_context = srs_path.read_text(encoding="utf-8")[:5000]
+                else:
+                    # For models or if RAG not available, use first 5000 chars
+                    srs_context = srs_path.read_text(encoding="utf-8")[:5000]
+            
+            # Build prompt
+            prompt = prompt_template
+            prompt = prompt.replace("{{class_name}}", className)
+            prompt = prompt.replace("{{file_name}}", fileName)
+            prompt = prompt.replace("{{skeleton}}", skeleton_content)
+            prompt = prompt.replace("{{arch_info}}", json.dumps(arch_item or {}, indent=2))
+            prompt = prompt.replace("{{srs_context}}", srs_context)
+            
+            # For controllers, add related models and views
+            if category == 'controller':
+                related_models = json.dumps(architecture.get("model", [])[:3], indent=2)
+                related_views = json.dumps(architecture.get("view", [])[:3], indent=2)
+                prompt = prompt.replace("{{related_models}}", related_models)
+                prompt = prompt.replace("{{related_views}}", related_views)
+            
+            # Generate code using LLM
+            try:
+                print(f"  → Calling LLM to generate code...")
+                generated_code = llm_client.generate_content(prompt)
+                
+                # Clean up the code (remove markdown code blocks if present)
+                generated_code = generated_code.strip()
+                if generated_code.startswith("```python"):
+                    generated_code = generated_code[9:]  # Remove ```python
+                if generated_code.startswith("```"):
+                    generated_code = generated_code[3:]  # Remove ```
+                if generated_code.endswith("```"):
+                    generated_code = generated_code[:-3]  # Remove trailing ```
+                generated_code = generated_code.strip()
+                
+                # Write to generated_src
+                output_file = generated_dir / fileName
+                try:
+                    output_file.write_text(generated_code, encoding="utf-8")
+                    print(f"  ✓ Code generated: {output_file.relative_to(project_root)}")
+                except Exception as e:
+                    print(f"  ✗ Failed to write file {output_file}: {e}")
+                    raise
+                
+                # Rate limiting - wait between requests
+                if idx < len(scaffold_files):
+                    time.sleep(2)  # 2 second delay between files
+                    
+            except QuotaExceededError as qe:
+                print(f"\n{str(qe)}")
+                print(f"\n[INFO] Code generation stopped. {idx-1} file(s) generated successfully.")
+                sys.exit(0)
+            except LLMConnectionError as lce:
+                print(f"\n[FATAL ERROR] LLM connection failed: {lce}")
+                print(f"[INFO] {idx-1} file(s) generated successfully before error.")
+                sys.exit(1)
+            except Exception as e:
+                print(f"  ✗ Error generating code for {fileName}: {e}")
+                # Continue with next file
+                continue
+        
+        # Verify generated files
+        generated_files = sorted([f for f in generated_dir.glob("*.py")])
+        print(f"\n[SUCCESS] Code generation complete!")
+        print(f"[SUCCESS] Generated {len(generated_files)} file(s) in: {generated_dir}")
+        if generated_files:
+            print(f"[INFO] Generated files:")
+            for gen_file in generated_files:
+                print(f"  - {gen_file.name}")
+        else:
+            print(f"[WARN] No files were generated. Check errors above.")
         
     except Exception as e:
-        # Catch ALL errors and print full details
         print(f"\n{'='*60}", flush=True)
-        print(f"[FATAL ERROR] Code generation failed", flush=True)
+        print(f"[FATAL ERROR] Generate-code command failed", flush=True)
         print(f"{'='*60}", flush=True)
         print(f"Error Type: {type(e).__name__}", flush=True)
         print(f"Error Message: {str(e)}", flush=True)
@@ -480,9 +751,6 @@ def cmd_generate(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-# ---------------------------------------------------------
-# run-fix command
-# ---------------------------------------------------------
 def cmd_run_fix(args: argparse.Namespace) -> None:
     """
     Automatically applies recommendations from audit report.
@@ -572,7 +840,6 @@ def main() -> None:
     )
     p_create.set_defaults(func=cmd_create_srs)
     
-    # extract komutu (MODULAR: Only Architect Agent)
     p_extract = subparsers.add_parser(
         "extract",
         help="Extract MVC architecture from SRS. Only runs Architect Agent (creates architecture_map.json).",
@@ -589,7 +856,6 @@ def main() -> None:
     )
     p_extract.set_defaults(func=cmd_extract)
     
-    # index-srs komutu (Legacy alias for extract)
     p_index = subparsers.add_parser(
         "index-srs",
         help="[LEGACY] Alias for 'extract' command.",
@@ -607,7 +873,6 @@ def main() -> None:
     p_index.set_defaults(func=cmd_index_srs)
 
 
-    # scaffold komutu (MODULAR: Only Scaffolder Agent)
     p_scaffold = subparsers.add_parser(
         "scaffold",
         help="Generate MVC scaffold files. Only runs Scaffolder Agent (no LLM, rule-based). Creates empty .py files in scaffolds/.",
@@ -620,7 +885,6 @@ def main() -> None:
     p_scaffold.set_defaults(func=cmd_scaffold)
     
     
-    # audit komutu (MODULAR: Only Rules & Reviewer Agents)
     p_audit = subparsers.add_parser(
         "audit",
         help="Run quality audit. Only runs Rules & Reviewer Agents (scans generated_src/ for MVC violations).",
@@ -633,7 +897,6 @@ def main() -> None:
     )
     p_audit.set_defaults(func=cmd_run_audit)
     
-    # run-audit komutu (Legacy alias for audit)
     p_run_audit = subparsers.add_parser(
         "run-audit",
         help="[LEGACY] Alias for 'audit' command.",
@@ -645,33 +908,23 @@ def main() -> None:
     )
     p_run_audit.set_defaults(func=cmd_run_audit)
 
-    # generate komutu (MODULAR: Only Coder Agents)
-    p_generate = subparsers.add_parser(
-        "generate",
-        help="Generate code implementation. Only runs Coder Agents (reads from scaffolds/, writes to generated_src/).",
+    p_generate_code = subparsers.add_parser(
+        "generate-code",
+        help="Generate complete code for scaffold files using LLM. Uses prompt templates to fill scaffold classes with real code.",
     )
-    p_generate.add_argument(
+    p_generate_code.add_argument(
         "--category",
-        choices=["model", "controller", "view"],
         required=True,
-        help="Category to process (model/controller/view). ALL files in this category will be generated.",
+        choices=["model", "controller", "view"],
+        help="Category to generate code for (model, controller, or view)",
     )
-    p_generate.set_defaults(func=cmd_generate)
+    p_generate_code.add_argument(
+        "--arch-path",
+        required=True,
+        help="Path to architecture JSON file (from 'extract' command).",
+    )
+    p_generate_code.set_defaults(func=cmd_generate_code)
     
-    # run-code komutu (Legacy alias for generate)
-    p_code = subparsers.add_parser(
-        "run-code",
-        help="[LEGACY] Alias for 'generate' command.",
-    )
-    p_code.add_argument(
-        "--category",
-        choices=["model", "controller", "view"],
-        required=True,
-        help="Category to process (model/controller/view). ALL files in this category will be generated.",
-    )
-    p_code.set_defaults(func=cmd_generate)
-
-    # run-fix komutu
     p_fix = subparsers.add_parser(
         "run-fix",
         help="Automatically apply recommendations from audit report. Only fixes specific issues mentioned in recommendations.",

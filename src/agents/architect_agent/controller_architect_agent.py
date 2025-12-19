@@ -45,21 +45,15 @@ class ControllerArchitectAgent(BaseArchitectAgent):
         extracted functions and models.
         """
         
-        # 1. Load data from preceding agents
         requirements_data = self._load_analysis("requirements_analysis.json")
         model_data = self._load_analysis("model_architecture.json")
         
-        # Extract function list from Requirements Agent
         functions = [f['name'] for f in requirements_data.get('system_functions', [])]
-        
-        # Extract entity list from Model Agent's output (which should be more refined)
         entities = [m['name'] for m in model_data.get('model', [])]
         
-        # Determine RAG query focus
         functions_list = ", ".join(functions) if functions else "system actions"
         entities_list = ", ".join(entities) if entities else "core data models"
 
-        # 2. Refine RAG Query using extracted structure (Targeted RAG)
         query = (
             f"For the high-level functions: [{functions_list}] and the data models: [{entities_list}], "
             "identify all user interactions, workflows, and specific controller "

@@ -36,25 +36,20 @@ class ViewArchitectAgent(BaseArchitectAgent):
         extracted Models and Controllers.
         """
 
-        # 1. Load data from preceding agents
         model_data = self._load_analysis("model_architecture.json")
         controller_data = self._load_analysis("controller_architecture.json")
 
-        # Extract required lists
         entities = [m['name'] for m in model_data.get('model', [])]
         
-        # Extract actions and merge them for a clearer prompt
         controller_actions = []
         for ctrl in controller_data.get('controller', []):
             ctrl_name = ctrl.get('name', 'UnnamedController')
             actions = ctrl.get('actions', [])
             controller_actions.extend([f"{ctrl_name}.{a}" for a in actions])
 
-        # Determine RAG query focus
         entities_list = ", ".join(entities) if entities else "core data models"
         actions_list = ", ".join(controller_actions) if controller_actions else "system actions"
 
-        # 2. Refine RAG Query using extracted structure (Targeted RAG)
         query = (
             f"For the data models: [{entities_list}] and the actions: [{actions_list}], "
             "identify all user interfaces, screens, components, and "
@@ -66,10 +61,7 @@ class ViewArchitectAgent(BaseArchitectAgent):
         if not chunks:
             raise ValueError("No relevant chunks found for view-layer extraction.")
 
-        # Build domain-specific prompt
         prompt = self._build_view_prompt(chunks)
-
-        # Run LLM → parse JSON automatically using BaseArchitectAgent
         view_json = self.llm_json(prompt)
 
         # Save output into /data folder

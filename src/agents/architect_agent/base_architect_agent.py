@@ -23,22 +23,15 @@ class BaseArchitectAgent:
     - Provide shared helper methods (e.g., retrieving context, saving outputs)
     """
 
-    # Tüm architect-agent’larda ortak olacak RAG ve LLM bağlantısını kuruyor.Her agent, yeni bir pipeline/LLM yaratmak zorunda kalmıyor
     def __init__(
         self,
         rag_pipeline: Optional[RAGPipeline] = None,
         llm_client: Optional[LLMClient] = None
     ):
-        # RAGPipeline instance shared by all architect agents
         self.rag = rag_pipeline or RAGPipeline()
-
-        # LLMClient instance shared by all architect agents
         self.llm = llm_client or LLMClient()
-
-        # Tracks which document is currently indexed
         self.current_document: Optional[str] = None
 
-        # Output directory for agents that want to save results
         project_root = Path(__file__).resolve().parents[3] 
         self.data_dir = project_root / "data" 
         self.data_dir.mkdir(exist_ok=True)
@@ -51,8 +44,6 @@ class BaseArchitectAgent:
         Indexes a PDF file into the RAG pipeline.
         Sub-agents inherit this method without duplicating logic.
         """
-
-        #It splits the PDF into chunks and extracts the embeddings. It puts them in the embedding store.
         info = self.rag.index_pdf(file, chunk_size=chunk_size, overlap=overlap) 
         self.current_document = info["document_name"]
         return info
@@ -81,7 +72,6 @@ class BaseArchitectAgent:
                 f"RAG could not find relevant chunks for query: {query}"
             )
 
-        # Chroma outputs as list-of-lists → return the first list.
         return documents[0]
 
     # ----------------------------------------------------------------------
@@ -93,6 +83,7 @@ class BaseArchitectAgent:
         Every architect agent (model/view/controller/orchestrator)
         can use this to persist results.
         """
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.data_dir / filename
 
         import json
@@ -131,9 +122,8 @@ class BaseArchitectAgent:
     def llm_json(self, prompt: str, max_retries: int = 3) -> dict:
         """
         Sends a prompt to LLM and parses the returned JSON using parse_json().
-        429 quota hatalarında otomatik retry yapar (API'nin önerdiği delay ile).
+        Automatically retries on 429 quota errors with API-suggested delay.
         """
-        # Rate limiting için kısa bir delay (her çağrı arasında)
         time.sleep(12)
         
         last_exception = None
@@ -145,29 +135,22 @@ class BaseArchitectAgent:
                 return self.parse_json(text)
                 
             except google_exceptions.ResourceExhausted as e:
-                # 429 quota hatası - API'nin önerdiği delay'i kullan
                 last_exception = e
+                retry_delay = 30
                 
-                # Retry delay'i exception'dan al (eğer varsa)
-                retry_delay = 30  # varsayılan 30 saniye
-                
-                # Önce exception'un retry_delay attribute'unu kontrol et
                 if hasattr(e, 'retry_delay') and e.retry_delay:
                     if hasattr(e.retry_delay, 'total_seconds'):
                         retry_delay = e.retry_delay.total_seconds()
                     elif hasattr(e.retry_delay, 'seconds'):
                         retry_delay = float(e.retry_delay.seconds)
                 
-                # Eğer bulamadıysak, exception mesajından parse etmeye çalış
                 if retry_delay == 30:
                     import re
                     error_str = str(e)
-                    # "Please retry in 46.96s" formatını yakala
                     match = re.search(r'retry in (\d+(?:\.\d+)?)s', error_str, re.IGNORECASE)
                     if match:
                         retry_delay = float(match.group(1))
                     else:
-                        # "retry_delay { seconds: 46 }" formatını yakala
                         match = re.search(r'retry_delay.*?seconds.*?(\d+(?:\.\d+)?)', error_str, re.IGNORECASE)
                         if match:
                             retry_delay = float(match.group(1))
@@ -176,20 +159,16 @@ class BaseArchitectAgent:
                     print(f"[BaseArchitectAgent] Quota exceeded (attempt {attempt + 1}/{max_retries}). Waiting {retry_delay:.1f}s before retry...")
                     time.sleep(retry_delay)
                 else:
-                    # Son deneme de başarısız oldu
                     raise ConnectionError(
                         f"Gemini API quota exceeded after {max_retries} attempts. "
                         f"Please wait and try again later. Last error: {e}"
                     )
                     
             except Exception as e:
-                # JSON parse hatası veya diğer hatalar için retry yapma
                 if "JSON" in str(e) or "parse" in str(e).lower():
-                    raise  # JSON parse hatası için direkt fırlat
-                # Diğer hatalar için de direkt fırlat
+                    raise
                 raise ConnectionError(f"LLM API call failed: {e}")
         
-        # Buraya gelmemeli ama güvenlik için
         if last_exception:
             raise ConnectionError(f"LLM API call failed after {max_retries} attempts: {last_exception}")
         raise ConnectionError("Unexpected error in llm_json")

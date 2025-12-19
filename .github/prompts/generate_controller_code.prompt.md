@@ -7,14 +7,13 @@ You are an expert Python developer.
 Complete the Controller class skeleton based on the SRS requirements.
 
 ## Clarification Phase
-If business logic is unclear:
-- **Action flow**: Ask about the step-by-step flow for each action
-- **Validation rules**: Ask what input validation is needed
-- **Error handling**: Ask how errors should be handled
-- **Model interactions**: Ask which models this controller uses
-- **View responses**: Ask which views should be rendered for each action
+If business logic is unclear from SRS:
+- **Use Architecture Information**: The architecture information ({{arch_info}}) contains essential details about this controller, including actions and responsibilities
+- **Use Related Models/Views**: The related models ({{related_models}}) and views ({{related_views}}) provide context for interactions
+- **Infer from context**: Use the class name, description, and action names to infer business logic
+- **Create reasonable defaults**: If specific details are missing, create a standard implementation based on common MVC patterns
 
-If the context is sufficient, proceed with code generation.
+**IMPORTANT**: Do NOT ask for clarification or complain about missing SRS details. Instead, use the available information (architecture, actions, related models/views) to generate a complete, functional controller implementation.
 
 ## Implementation Requirements
 

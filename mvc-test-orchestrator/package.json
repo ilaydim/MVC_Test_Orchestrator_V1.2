@@ -39,12 +39,8 @@
             "description": "Generate scaffold files (Scaffolder Agent only, no LLM)"
           },
           {
-            "name": "generate",
-            "description": "Generate implementation code (Coder Agents only)"
-          },
-          {
-            "name": "code",
-            "description": "[LEGACY] Alias for generate command"
+            "name": "generate_code",
+            "description": "Generate code using VS Code Agent (reads scaffolds/, writes to generated_src/)"
           },
           {
             "name": "audit",

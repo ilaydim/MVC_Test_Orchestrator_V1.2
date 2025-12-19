@@ -48,3 +48,5 @@ out/
 
 # Bundled dependencies
 *.vsix
+
+generated_src/

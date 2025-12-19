@@ -7,13 +7,12 @@ You are an expert Python developer.
 Complete the View class skeleton based on the SRS requirements.
 
 ## Clarification Phase
-If UI details are missing:
-- **UI elements**: Ask what should be displayed on this screen
-- **Data binding**: Ask which data from models should be shown
-- **User interactions**: Ask what actions users can perform on this view
-- **Layout**: Ask about the visual organization of elements
+If UI details are missing from SRS:
+- **Use Architecture Information**: The architecture information ({{arch_info}}) contains essential details about this view
+- **Infer from context**: Use the class name, description, and related models/controllers to infer UI requirements
+- **Create reasonable defaults**: If specific details are missing, create a standard implementation based on the view type (list, detail, form, etc.)
 
-If enough context is provided, proceed with code generation.
+**IMPORTANT**: Do NOT ask for clarification or complain about missing SRS details. Instead, use the available information (architecture, class name, related components) to generate a complete, functional view implementation.
 
 ## Implementation Requirements
 

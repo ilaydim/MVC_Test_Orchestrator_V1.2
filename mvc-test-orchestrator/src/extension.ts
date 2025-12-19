@@ -67,112 +67,139 @@ async function runPythonCommand(
     }
 
     const pythonCmd = `${pythonExec} -m src.cli.mvc_arch_cli ${commandName} ${args} ${outputArg}`;
-    await vscode.window.withProgress(
-        {
-            location: vscode.ProgressLocation.Notification,
-            title: `Running MVC Orchestrator (${commandName})...`,
-            cancellable: false,
-        },
-        () =>
-                new Promise<void>((resolve, reject) => {
-                    try {
-                // PYTHONIOENCODING=utf-8 eklenerek I/O hatası çözülür.
-                const proc = exec(pythonCmd, { 
-                    cwd: workspaceRoot,
-                            env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
-                            // Timeout ayarları (60 saniye)
-                            timeout: 60000,
-                            maxBuffer: 1024 * 1024 * 10 // 10MB buffer
-                        }, (error) => {
-                            if (error) {
-                                console.error(`[${commandName}] Process error:`, safeErrorToString(error));
-                            }
-                });
-
-                // Collect all output (stdout + stderr) for error reporting
-                let allOutput = "";
-                let allErrors = "";
-                
-                proc.stdout?.on("data", (d) => {
-                    const output = d.toString();
-                    allOutput += output;
-                    console.log(`[${commandName} stdout]`, output);
-                    if (outputChannel) {
-                        outputChannel.appendLine(`[${commandName}] ${output}`);
-                    }
-                });
-                
-                proc.stderr?.on("data", (d) => {
-                    const errorOutput = d.toString();
-                    allErrors += errorOutput;
-                    console.error(`[${commandName} stderr]`, errorOutput);
-                    if (outputChannel) {
-                        outputChannel.appendLine(`[${commandName} ERROR] ${errorOutput}`);
-                    }
-                });
-
-                proc.on("close", (code) => {
-                    if (code === 0) {
-                        let successMessage = `Command '${commandName}' executed successfully.`;
-                        
-                        // Don't show notification for generate/code (extension handles it)
-                        if (commandName === "generate" || commandName === "run-code") {
-                            // Silent - extension will show result in chat
-                        } else if (commandName === "create-srs") {
-                            vscode.window.showInformationMessage(`SRS created → data/srs_document.txt\nNext: Run "Extract Architecture" to generate architecture.`);
-                        } else if (commandName === "extract" || commandName === "index-srs") {
-                            vscode.window.showInformationMessage(`Architecture extracted → data/architecture_map.json`);
-                        } else if (commandName === "scaffold") {
-                            vscode.window.showInformationMessage("Scaffold created successfully in /scaffolds/mvc_skeleton/");
-                        } else if (commandName === "audit" || commandName === "run-audit") {
-                            vscode.window.showInformationMessage("Audit completed. Check data/final_audit_report.json");
-                        } else if (commandName === "run-fix") {
-                            // Silent - extension will show result in chat
-                        } else {
-                            vscode.window.showInformationMessage(`Command '${commandName}' executed successfully.`);
-                        }
-                                resolve();
-                    } else {
-                        // Show detailed error with full output
-                        const fullError = `Python CLI failed (exit code ${code})\n\n` +
-                                         `STDOUT:\n${allOutput}\n\n` +
-                                         `STDERR:\n${allErrors}\n\n` +
-                                         `Check "MVC Orchestrator" output panel for full details.`;
-                        
-                        console.error(`[${commandName}] Full error output:`, fullError);
-                        
+    // Only show progress for long-running commands
+    const showProgress = commandName === "extract" || commandName === "create-srs" || commandName === "generate-code";
+    
+    const runCommand = () => new Promise<void>((resolve, reject) => {
+        try {
+            // PYTHONIOENCODING=utf-8 eklenerek I/O hatası çözülür.
+            const proc = exec(pythonCmd, { 
+                cwd: workspaceRoot,
+                env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+                // Timeout ayarları (120 saniye for long operations)
+                timeout: commandName === "generate-code" ? 300000 : 120000, // 5 min for generate-code, 2 min for others
+                maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+            }, (error) => {
+                // Only log real errors, not expected ones (timeout is handled separately)
+                if (error) {
+                    const errorCode = String(error.code || '');
+                    const errorSignal = String(error.signal || '');
+                    if (errorCode !== 'ETIMEDOUT' && errorSignal !== 'SIGTERM') {
+                        // Log to output channel only, not console
                         if (outputChannel) {
-                            outputChannel.appendLine(`\n========== COMMAND FAILED (exit ${code}) ==========`);
-                            outputChannel.appendLine(`STDOUT:\n${allOutput}`);
-                            outputChannel.appendLine(`STDERR:\n${allErrors}`);
+                            outputChannel.appendLine(`[${commandName}] Process error: ${safeErrorToString(error)}`);
+                        }
+                    }
+                }
+            });
+
+            // Collect all output (stdout + stderr) for error reporting
+            let allOutput = "";
+            let allErrors = "";
+            
+            proc.stdout?.on("data", (d) => {
+                const output = d.toString();
+                allOutput += output;
+                // Only log to output channel, not console (reduces noise)
+                if (outputChannel) {
+                    outputChannel.appendLine(`[${commandName}] ${output.trim()}`);
+                }
+            });
+            
+            proc.stderr?.on("data", (d) => {
+                const errorOutput = d.toString();
+                // Filter out common non-error messages
+                const trimmed = errorOutput.trim();
+                if (trimmed && !trimmed.match(/^\d+$/)) { // Ignore single numbers (like "2")
+                    allErrors += errorOutput;
+                    // Only log to output channel, not console
+                    if (outputChannel) {
+                        outputChannel.appendLine(`[${commandName} ERROR] ${errorOutput.trim()}`);
+                    }
+                }
+            });
+
+            proc.on("close", (code) => {
+                if (code === 0) {
+                    // Don't show notification for generate-code (extension handles it in chat)
+                    if (commandName === "generate-code") {
+                        // Silent - extension will show result in chat
+                    } else if (commandName === "create-srs") {
+                        vscode.window.showInformationMessage(`SRS created → data/srs_document.txt\nNext: Run "Extract Architecture" to generate architecture.`);
+                    } else if (commandName === "extract" || commandName === "index-srs") {
+                        vscode.window.showInformationMessage(`Architecture extracted → data/architecture_map.json`);
+                    } else if (commandName === "scaffold") {
+                        vscode.window.showInformationMessage("Scaffold created successfully in /scaffolds/mvc_skeleton/");
+                    } else if (commandName === "audit" || commandName === "run-audit") {
+                        vscode.window.showInformationMessage("Audit completed. Check data/final_audit_report.json");
+                    } else if (commandName === "run-fix") {
+                        // Silent - extension will show result in chat
+                    }
+                    resolve();
+                } else {
+                    // Only show errors for real failures (not null/timeout which might be handled)
+                    const hasRealError = allErrors.trim().length > 0 && !allErrors.trim().match(/^\d+$/);
+                    const exitCode = code ?? 'unknown';
+                    
+                    if (hasRealError) {
+                        // Log to output channel only (not console)
+                        if (outputChannel) {
+                            outputChannel.appendLine(`\n========== COMMAND FAILED (exit ${exitCode}) ==========`);
+                            if (allOutput.trim()) {
+                                outputChannel.appendLine(`STDOUT:\n${allOutput}`);
+                            }
+                            if (allErrors.trim()) {
+                                outputChannel.appendLine(`STDERR:\n${allErrors}`);
+                            }
                             outputChannel.appendLine(`==========================================\n`);
-                            outputChannel.show(true); // Show output panel
                         }
                         
-                        vscode.window.showErrorMessage(
-                            `Python CLI failed (exit ${code}). Check "MVC Orchestrator" output panel for full traceback.`,
-                            "Show Output"
-                        ).then(selection => {
-                            if (selection === "Show Output" && outputChannel) {
-                                outputChannel.show(true);
-                            }
-                        });
-                        
-                                resolve(); // reject yerine resolve - pipeline devam etsin
-                            }
-                        });
-                        
-                        proc.on("error", (err) => {
-                            console.error(`[${commandName}] Process spawn error:`, safeErrorToString(err));
-                            vscode.window.showErrorMessage(`Failed to start Python process: ${err.message}`);
-                            resolve();
-                        });
-                    } catch (execError) {
-                        console.error(`[${commandName}] Exec error:`, safeErrorToString(execError));
-                        reject(execError);
+                        // Only show error message for non-timeout errors
+                        if (code !== null && code !== undefined) {
+                            vscode.window.showErrorMessage(
+                                `Python CLI failed (exit ${code}). Check "MVC Orchestrator" output panel for details.`,
+                                "Show Output"
+                            ).then(selection => {
+                                if (selection === "Show Output" && outputChannel) {
+                                    outputChannel.show(true);
+                                }
+                            });
+                        }
                     }
-                })
+                    
+                    resolve(); // Always resolve to continue pipeline
+                }
+            });
+            
+            proc.on("error", (err) => {
+                // Only log real spawn errors to output channel
+                if (outputChannel) {
+                    outputChannel.appendLine(`[${commandName}] Process spawn error: ${safeErrorToString(err)}`);
+                }
+                vscode.window.showErrorMessage(`Failed to start Python process: ${err.message}`);
+                resolve();
+            });
+        } catch (execError) {
+            // Only log to output channel
+            if (outputChannel) {
+                outputChannel.appendLine(`[${commandName}] Exec error: ${safeErrorToString(execError)}`);
+            }
+            reject(execError);
+        }
+    });
+
+    if (showProgress) {
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: `Running MVC Orchestrator (${commandName})...`,
+                cancellable: false,
+            },
+            () => runCommand()
         );
+    } else {
+        await runCommand();
+    }
     } catch (outerError) {
         console.error(`[runPythonCommand] Outer error:`, safeErrorToString(outerError));
         vscode.window.showErrorMessage(`Command failed: ${outerError instanceof Error ? outerError.message : String(outerError)}`);
@@ -639,12 +666,12 @@ print("ERROR: No PDF library installed. Install with: pip install pdfplumber PyP
                         await runPythonCommand(workspaceRoot, "scaffold", args, "scaffold_log.txt");
                         
                         stream.markdown(`✅ **Scaffold created**: \`scaffolds/mvc_skeleton/\`\n\n`);
-                        stream.markdown(`**Next step**: Use \`@mvc /generate\` to implement code`);
+                        stream.markdown(`**Next step**: Use \`@mvc /generate_code\` to implement code`);
                     } else {
                         stream.markdown(`❌ Architecture not found. Run \`@mvc /extract\` first.`);
                     }
                 }
-                else if (command === "generate" || command === "code") {
+                else if (command === "generate_code") {
                     // Ask user: which category? (All files in that category will be processed)
                     const categoryChoice = await vscode.window.showQuickPick([
                         { label: '📊 Models', value: 'model', description: 'Process ALL model files' },
@@ -660,51 +687,159 @@ print("ERROR: No PDF library installed. Install with: pip install pdfplumber PyP
                         return {};
                     }
                     
-                    const args = `--category ${categoryChoice.value}`;
+                    const category = categoryChoice.value;
                     
                     stream.markdown(`⚙️ **Category**: ${categoryChoice.label}\n\n`);
-                    stream.markdown(`**🔄 Generating code (Coder Agent only - reads from scaffolds/, writes to generated_src/)...**\n\n`);
+                    stream.markdown(`**🔄 Generating code using LLM (Python Agent)...**\n\n`);
                     
-                    // Run Python command - it will show progress in Output channel
-                    await runPythonCommand(workspaceRoot, "generate", args, "code_generation_log.txt");
-                    
-                    // Wait a bit for files to be written
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    // Read generated files count for selected category
-                    const generatedDir = path.join(workspaceRoot, "generated_src");
-                    const categoryDir = path.join(generatedDir, categoryChoice.value === 'model' ? 'models' : categoryChoice.value === 'controller' ? 'controllers' : 'views');
-                    
-                    if (fs.existsSync(categoryDir)) {
-                        try {
-                            const fileCount = fs.readdirSync(categoryDir).filter(f => f.endsWith('.py')).length;
-                            
-                            if (fileCount > 0) {
-                                stream.markdown(`✅ **Code generation complete!**\n\n`);
-                                stream.markdown(`📊 **Generated**: ${fileCount} ${categoryChoice.label.toLowerCase()} files\n\n`);
-                                stream.markdown(`📂 Location: \`generated_src/${categoryChoice.value === 'model' ? 'models' : categoryChoice.value === 'controller' ? 'controllers' : 'views'}/\`\n\n`);
-                            } else {
-                                stream.markdown(`⚠️ **No files generated**\n`);
-                                stream.markdown(`Check Output panel ("MVC Orchestrator") for errors.\n\n`);
-                            }
-                        } catch (err) {
-                            stream.markdown(`✅ **Code generation finished**\n`);
-                            stream.markdown(`Check \`generated_src/\` folder\n\n`);
+                    try {
+                        // Check architecture exists
+                        const archPath = path.join(workspaceRoot, "data", "architecture_map.json");
+                        if (!fs.existsSync(archPath)) {
+                            stream.markdown(`❌ Architecture not found. Run \`@mvc /extract\` first.\n`);
+                            return {};
                         }
-                    } else {
-                        stream.markdown(`⚠️ **Output directory not found**\n`);
-                        stream.markdown(`Check Output panel for errors.\n\n`);
+                        
+                        // Check scaffold directory exists
+                        const scaffoldDir = path.join(workspaceRoot, "scaffolds", "mvc_skeleton", `${category}s`);
+                        if (!fs.existsSync(scaffoldDir)) {
+                            stream.markdown(`❌ Scaffold directory not found: \`${scaffoldDir}\`\n`);
+                            stream.markdown(`Run \`@mvc /scaffold\` first.\n`);
+                            return {};
+                        }
+                        
+                        const scaffoldFiles = fs.readdirSync(scaffoldDir)
+                            .filter(f => f.endsWith('.py'))
+                            .sort();
+                        
+                        if (scaffoldFiles.length === 0) {
+                            stream.markdown(`❌ No scaffold files found in \`${scaffoldDir}\`\n`);
+                            stream.markdown(`Run \`@mvc /scaffold\` first.\n`);
+                            return {};
+                        }
+                        
+                        stream.markdown(`📋 **Found ${scaffoldFiles.length} file(s) to process**\n\n`);
+                        stream.markdown(`**Generating code for all ${category} files using LLM...**\n\n`);
+                        
+                        // Call Python CLI to generate code
+                        const normalizedArchPath = archPath.replace(/\\/g, '/');
+                        const args = `--category ${category} --arch-path "${normalizedArchPath}"`;
+                        await runPythonCommand(workspaceRoot, "generate-code", args, "generate_code_log.txt");
+                        
+                        // Check generated files
+                        const generatedDir = path.join(workspaceRoot, "generated_src", `${category}s`);
+                        if (fs.existsSync(generatedDir)) {
+                            const generatedFiles = fs.readdirSync(generatedDir)
+                                .filter(f => f.endsWith('.py'))
+                                .sort();
+                            
+                            stream.markdown(`---\n\n`);
+                            if (generatedFiles.length > 0) {
+                                stream.markdown(`✅ **Code generation complete!**\n\n`);
+                                stream.markdown(`📂 Generated ${generatedFiles.length} file(s) in: \`generated_src/${category}s/\`\n\n`);
+                                stream.markdown(`**Generated files:**\n`);
+                                generatedFiles.forEach((file, idx) => {
+                                    stream.markdown(`${idx + 1}. \`${file}\`\n`);
+                                });
+                                stream.markdown(`\n`);
+                            } else {
+                                stream.markdown(`⚠️ **Warning**: Directory exists but no files were generated.\n`);
+                                stream.markdown(`Check "MVC Orchestrator" output panel for Python errors.\n\n`);
+                            }
+                        } else {
+                            stream.markdown(`---\n\n`);
+                            stream.markdown(`⚠️ **Warning**: Generated directory not found at: \`generated_src/${category}s/\`\n\n`);
+                            stream.markdown(`**Possible causes:**\n`);
+                            stream.markdown(`1. Python CLI failed to create directory\n`);
+                            stream.markdown(`2. Project root path calculation error\n`);
+                            stream.markdown(`3. Permission issues\n\n`);
+                            stream.markdown(`**Check:**\n`);
+                            stream.markdown(`- Open "MVC Orchestrator" output panel (View → Output → Select "MVC Orchestrator")\n`);
+                            stream.markdown(`- Look for Python error messages\n`);
+                            stream.markdown(`- Verify scaffold files exist in: \`scaffolds/mvc_skeleton/${category}s/\`\n\n`);
+                        }
+                        
+                    } catch (error) {
+                        console.error('[/generate_code] Error:', safeErrorToString(error));
+                        const errMsg = error instanceof Error ? error.message : String(error);
+                        stream.markdown(`❌ **Error**: ${errMsg}\n`);
                     }
                 }
                 else if (command === "audit") {
                     stream.markdown(`**🔄 Running quality audit (Rules & Reviewer Agents only)...**\n\n`);
+                    stream.markdown(`**Scanning current code files for violations...**\n\n`);
+                    
                     const archPath = path.join(workspaceRoot, "data", "architecture_map.json");
                     // Normalize path - don't use JSON.stringify for Windows paths
                     const normalizedArchPath = archPath.replace(/\\/g, '/');
                     const args = `--arch-path "${normalizedArchPath}"`;
+                    
+                    // Ensure data directory exists
+                    const dataDir = path.join(workspaceRoot, "data");
+                    if (!fs.existsSync(dataDir)) {
+                        fs.mkdirSync(dataDir, { recursive: true });
+                    }
+                    
                     await runPythonCommand(workspaceRoot, "audit", args, "audit_result.txt");
-                    stream.markdown(`✅ **Audit complete**. Check \`data/final_audit_report.json\`\n\n`);
-                    stream.markdown(`💡 **Tip**: Use \`@mvc /fix\` to automatically apply recommendations.\n\n`);
+                    
+                    // Wait a bit for file system to sync (Windows sometimes needs this)
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Check if report was created/updated
+                    const reportPath = path.join(workspaceRoot, "data", "final_audit_report.json");
+                    
+                    // Try multiple times in case of file system delay
+                    let reportExists = false;
+                    for (let i = 0; i < 3; i++) {
+                        if (fs.existsSync(reportPath)) {
+                            reportExists = true;
+                            break;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                    
+                    if (reportExists) {
+                        try {
+                            const reportContent = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+                            const passed = reportContent.passed || false;
+                            const recommendations = reportContent.recommendations || [];
+                            
+                            stream.markdown(`✅ **Audit complete**\n\n`);
+                            stream.markdown(`📄 **Report**: \`data/final_audit_report.json\`\n\n`);
+                            
+                            if (passed) {
+                                stream.markdown(`✅ **Status**: PASSED - No violations detected\n\n`);
+                            } else {
+                                stream.markdown(`⚠️ **Status**: FAILED - ${recommendations.length} issue(s) found\n\n`);
+                                if (recommendations.length > 0) {
+                                    stream.markdown(`**Top Issues:**\n`);
+                                    recommendations.slice(0, 3).forEach((rec: any, idx: number) => {
+                                        stream.markdown(`${idx + 1}. **${rec.violation_type || 'Violation'}** in \`${rec.file || 'unknown'}\`\n`);
+                                        stream.markdown(`   ${rec.problem || 'Issue detected'}\n\n`);
+                                    });
+                                    if (recommendations.length > 3) {
+                                        stream.markdown(`... and ${recommendations.length - 3} more issue(s)\n\n`);
+                                    }
+                                }
+                            }
+                            
+                            stream.markdown(`💡 **Tip**: Use \`@mvc /fix\` to automatically apply recommendations.\n\n`);
+                            stream.markdown(`🔄 **Note**: Re-run \`@mvc /audit\` after making code changes to update the report.\n\n`);
+                        } catch (err) {
+                            stream.markdown(`✅ **Audit complete**. Check \`data/final_audit_report.json\`\n\n`);
+                        }
+                    } else {
+                        stream.markdown(`⚠️ **Warning**: Audit completed but report file not found at: \`data/final_audit_report.json\`\n\n`);
+                        stream.markdown(`**Possible causes:**\n`);
+                        stream.markdown(`1. Python CLI failed silently\n`);
+                        stream.markdown(`2. File system delay (Windows)\n`);
+                        stream.markdown(`3. Permission issues\n\n`);
+                        stream.markdown(`**Check:**\n`);
+                        stream.markdown(`- Open "MVC Orchestrator" output panel (View → Output → Select "MVC Orchestrator")\n`);
+                        stream.markdown(`- Look for Python error messages\n`);
+                        stream.markdown(`- Verify \`generated_src/\` directory exists with Python files\n`);
+                        stream.markdown(`- Try running \`@mvc /audit\` again\n\n`);
+                    }
                 }
                 else if (command === "fix") {
                     stream.markdown(`**🔧 Applying audit recommendations...**\n\n`);
@@ -721,7 +856,7 @@ print("ERROR: No PDF library installed. Install with: pip install pdfplumber PyP
                     stream.markdown(`**2. Sequential Workflow (MODULAR):**\n`);
                     stream.markdown(`- \`@mvc /extract\` - Extract architecture (Architect Agent only)\n`);
                     stream.markdown(`- \`@mvc /scaffold\` - Create skeleton files (Scaffolder Agent only, no LLM)\n`);
-                    stream.markdown(`- \`@mvc /generate\` - Generate code (Coder Agents only, reads scaffolds/, writes generated_src/)\n`);
+                    stream.markdown(`- \`@mvc /generate_code\` - Generate code using VS Code Agent (reads scaffolds/, writes to generated_src/)\n`);
                     stream.markdown(`- \`@mvc /audit\` - Run quality audit (Rules & Reviewer Agents only)\n`);
                     stream.markdown(`- \`@mvc /fix\` - Automatically apply audit recommendations\n\n`);
                     stream.markdown(`---\n\n`);

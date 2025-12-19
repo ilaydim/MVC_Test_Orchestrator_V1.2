@@ -34,18 +34,13 @@ class ModelArchitectAgent(BaseArchitectAgent):
         High-level method for extracting model architecture using targeted RAG.
         """
 
-        # 1. Load entities from the requirements analysis
         analysis_data = self._load_analysis()
         entities = [e['name'] for e in analysis_data.get('domain_entities', [])]
         
         if not entities:
-            # Fallback for systems that failed to extract entities
             entities_list = "core domain entities"
         else:
-            # Create a list of entities to embed in the RAG query
             entities_list = ", ".join(entities)
-
-        # 2. Refine RAG Query using extracted entities
         query = (
             f"For the specific domain entities: [{entities_list}], identify their concrete "
             "attributes, required fields, and relationships described in the SRS. "
@@ -57,13 +52,8 @@ class ModelArchitectAgent(BaseArchitectAgent):
         if not chunks:
             raise ValueError("No relevant chunks found for model extraction.")
 
-        # Build domain-specific prompt
         prompt = self._build_model_prompt(chunks)
-
-        # Call LLM and automatically parse JSON using base agent
         model_json = self.llm_json(prompt)
-
-        # Save output to /data for reuse by scaffolder and Coder Agent
         self.save_output(model_json, "model_architecture.json")
 
         return model_json
