@@ -29,8 +29,8 @@ Projenize submodule olarak eklemek.
 ```bash
 # Ana projenizin yanına MVC Test Orchestrator'ı klonlayın
 cd /path/to/your/workspace
-git clone https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # Kurulum yapın
 ./install.sh  # veya install.bat (Windows)
@@ -43,8 +43,8 @@ echo "GOOGLE_API_KEY=your_api_key" > .env
 
 ```bash
 # MVC Test Orchestrator'ı klonlayın
-git clone https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # Editable mode'da kurun (değişiklikler otomatik yansır)
 pip install -e .
@@ -117,8 +117,8 @@ cp -r scaffolds/mvc_skeleton/* "$YOUR_PROJECT/src/"
 
 ```bash
 # MVC Test Orchestrator'ı klonlayıp editable mode'da kurun
-git clone https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 pip install -e .
 
 # Veya direkt path ile kullanabilirsiniz (PYTHONPATH ekleyerek)
@@ -339,7 +339,7 @@ if __name__ == "__main__":
 cd /path/to/your/project
 
 # MVC Test Orchestrator'ı submodule olarak ekleyin
-git submodule add https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git tools/mvc-orchestrator
+git submodule add https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git tools/mvc-orchestrator
 
 # Submodule'ü initialize edin
 git submodule update --init --recursive
@@ -421,7 +421,7 @@ class CustomAgent(BaseArchitectAgent):
 -e /path/to/mvc-test-orchestrator
 
 # Veya git repository'den
-git+https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git@main
+git+https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git@main
 ```
 
 ### setup.py / pyproject.toml'de Belirtme
@@ -442,7 +442,7 @@ veya
 # pyproject.toml
 [project]
 dependencies = [
-    "mvc-test-orchestrator @ git+https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git",
+    "mvc-test-orchestrator @ git+https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git",
 ]
 ```
 

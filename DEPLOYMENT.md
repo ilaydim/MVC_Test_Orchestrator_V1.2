@@ -57,10 +57,10 @@ Projenizi GitHub'da yayınlamadan önce:
 git remote -v
 
 # Eğer remote yoksa, GitHub repository URL'inizi ekleyin
-git remote add origin https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git
+git remote add origin https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
 
 # Veya SSH kullanıyorsanız:
-# git remote add origin git@github.com:YOUR_USERNAME/mvc-test-orchestrator.git
+# git remote add origin git@github.com:ilaydim/MVC_Test_Orchestrator_V1.2.git  # SSH için
 
 # Remote'u kontrol edin
 git remote -v
@@ -87,7 +87,7 @@ git push -u origin main
 README.md dosyasındaki placeholder'ları güncelleyin:
 
 1. **Repository URL'ini Güncelle**
-   - `https://github.com/your-username/mvc-test-orchestrator.git` yerine gerçek URL'inizi yazın
+   - Repository URL: `https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git`
 
 2. **Kurulum Bölümündeki Komutları Güncelle**
    - Git clone komutlarındaki URL'i güncelleyin
@@ -116,8 +116,8 @@ README.md dosyasındaki placeholder'ları güncelleyin:
 
    ### Quick Start
    ```bash
-   git clone https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git
-   cd mvc-test-orchestrator
+   git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+   cd MVC_Test_Orchestrator_V1.2
    ./install.sh  # Linux/Mac
    # veya
    install.bat   # Windows

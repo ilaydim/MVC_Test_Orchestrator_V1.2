@@ -7,8 +7,8 @@ MVC Test Orchestrator projesine katkıda bulunmak istediğiniz için teşekkürl
 1. Repository'yi fork edin
 2. Local'de clone edin:
    ```bash
-   git clone https://github.com/your-username/mvc-test-orchestrator.git
-   cd mvc-test-orchestrator
+   git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+   cd MVC_Test_Orchestrator_V1.2
    ```
 3. Development branch oluşturun:
    ```bash

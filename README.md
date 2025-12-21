@@ -80,8 +80,8 @@ Model değiştirmek için `src/core/config.py` dosyasını düzenleyin:
 **Linux/Mac:**
 ```bash
 # Repository'yi klonlayın
-git clone https://github.com/your-username/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # Kurulum scriptini çalıştırın
 chmod +x install.sh
@@ -91,8 +91,8 @@ chmod +x install.sh
 **Windows:**
 ```powershell
 # Repository'yi klonlayın
-git clone https://github.com/your-username/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # Kurulum scriptini çalıştırın
 install.bat
@@ -102,8 +102,8 @@ install.bat
 
 ```bash
 # 1. Repository'yi klonlayın
-git clone https://github.com/your-username/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # 2. Virtual environment oluşturun (önerilen)
 python -m venv .venv
@@ -133,8 +133,8 @@ echo "GOOGLE_API_KEY=your_api_key_here" > .env
 
 ```bash
 # Repository'yi klonlayın
-git clone https://github.com/your-username/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # Paketi kurun (editable mode)
 pip install -e .
@@ -704,8 +704,8 @@ MVC Test Orchestrator'ı başka bir projede kullanmak için birkaç yöntem vard
 
 ```bash
 # MVC Test Orchestrator'ı klonlayın
-git clone https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 ./install.sh
 
 # Başka projeden kullanın
@@ -716,7 +716,7 @@ python -m src.cli.mvc_arch_cli create-srs --user-idea "Your idea" --output data/
 
 ```python
 # MVC Test Orchestrator'ı editable mode'da kurun
-pip install -e /path/to/mvc-test-orchestrator
+pip install -e /path/to/MVC_Test_Orchestrator_V1.2
 
 # Kodunuzda kullanın
 from src.agents.srs_writer_agent import SRSWriterAgent
@@ -733,7 +733,7 @@ srs_path = srs_writer.generate_srs("Your project idea")
 
 ```bash
 # Ana projenize submodule olarak ekleyin
-git submodule add https://github.com/YOUR_USERNAME/mvc-test-orchestrator.git tools/mvc-orchestrator
+git submodule add https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git tools/mvc-orchestrator
 ```
 
 **Detaylı bilgi için**: [USAGE.md](USAGE.md) dosyasına bakın.

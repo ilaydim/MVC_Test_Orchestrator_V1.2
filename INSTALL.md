@@ -19,8 +19,8 @@ Bu doküman, MVC Test Orchestrator'ı GitHub'dan indirip kurmanız için detayl�
 
 ```bash
 # 1. Repository'yi klonlayın
-git clone https://github.com/your-username/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # 2. Kurulum scriptini çalıştırın
 chmod +x install.sh
@@ -34,8 +34,8 @@ nano .env  # veya başka bir editör kullanın
 
 ```powershell
 # 1. Repository'yi klonlayın
-git clone https://github.com/your-username/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 
 # 2. Kurulum scriptini çalıştırın
 install.bat
@@ -51,8 +51,8 @@ notepad .env
 ### 1. Repository'yi Klonlayın
 
 ```bash
-git clone https://github.com/your-username/mvc-test-orchestrator.git
-cd mvc-test-orchestrator
+git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
+cd MVC_Test_Orchestrator_V1.2
 ```
 
 ### 2. Virtual Environment Oluşturun (Önerilen)
