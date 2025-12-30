@@ -89,9 +89,13 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "^25.0.1",
-    "@types/vscode": "^1.106.1",
+    "@types/vscode": "^1.80.0",
     "mocha": "^11.7.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "repository": {
+  "type": "git",
+  "url": "https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2"
   }
 }
