@@ -10,8 +10,6 @@ This project is designed as an advanced **CLI-driven research and learning tool*
 
 ## 📋 Table of Contents
 
-## 📋 Table of Contents
-
 - [Features](#-features)
 - [System Requirements](#-system-requirements)
 - [Installation](#-installation)
@@ -61,40 +59,50 @@ This project is designed as an advanced **CLI-driven research and learning tool*
   https://makersuite.google.com/app/apikey  
 - **Disk Space**: ~500 MB  
 
-### Model Configuration
-
-Default model: `gemini-2.5-flash`
-
-Model settings can be changed in: `src/core/config.py` 
 ---
 
 ## 🚀 Installation
-This section explains how to install **MVC Test Orchestrator** locally using a clean and manual setup process.
+This section describes the available installation methods for **MVC Test Orchestrator**.  Manual installation is provided for advanced users and research purposes.
 
-### 1. Clone the Repository
+#### 1. Download the VSIX Package
+
+1. Go to the GitHub Releases page:
+   https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2/releases
+2. Open the latest release (**v1.2.0**)
+3. Download the file: mvc-test-orchestrator-1.2.0.vsix
+* Download Location : The VSIX file is available under: GitHub → Releases → v1.2.0 → Assets
+
+#### 2. Install in VS Code
+
+1. Open **Visual Studio Code**
+2. Go to the **Extensions** view
+3. Click the **three dots (⋯)** menu
+4. Select **“Install from VSIX…”**
+5. Choose the downloaded `.vsix` file
+6. Restart VS Code if prompted
+
+### 3. Clone the Repository
 
 ```bash
 git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
 cd MVC_Test_Orchestrator_V1.2
 ```
-### 2. Create and Activate a Virtual Environment
 
+### 4. Create and Activate a Virtual Environment
+```bash
 python -m venv .venv
 
-# Linux / macOS
-source .venv/bin/activate
+Linux / macOS : source .venv/bin/activate
+Windows : .venv\Scripts\activate
+```
 
-# Windows
-.venv\Scripts\activate
-
-## 3. Install Dependencies
+## 5. Install Dependencies
 
 ```bash
-pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## 4. Configure the API Key
+## 6. Configure the API Key
 Create a .env file in the project root directory and add your Google Gemini API key. 
 ```env
 GOOGLE_API_KEY=your_api_key_here
@@ -107,13 +115,6 @@ GOOGLE_API_KEY=your_api_key_here
 4. Copy the generated key and paste it into the .env file
 ---
 
-## 5. Verify the Installation
-```bash
-python -m src.cli.mvc_arch_cli create-srs \
-  --user-idea "Simple blog with posts and comments" \
-  --output data/srs_document.txt
-```
-
 ## 🎯 Quick Start
 
 ### Usage with VS Code (Recommended)
@@ -121,7 +122,7 @@ python -m src.cli.mvc_arch_cli create-srs \
 Using `@mvc` in VS Code Copilot Chat:
 
 ```bash
-@mvc /create-srs Simple blog with posts and comments
+@mvc /create-srs "Write your idea."
 @mvc /extract
 @mvc /scaffold
 @mvc /generate_code --category model
