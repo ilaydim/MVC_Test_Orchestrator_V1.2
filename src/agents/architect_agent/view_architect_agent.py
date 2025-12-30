@@ -24,8 +24,14 @@ class ViewArchitectAgent(BaseArchitectAgent):
                 f"Required analysis file not found: {filename}. "
                 "Ensure preceding agents have run successfully."
             )
-        with open(analysis_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(analysis_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Could not decode JSON in {filename}. "
+                f"LLM produced malformed JSON. Error: {e}"
+            )
 
     # ----------------------------------------------------------------------
     # Main Entry Point

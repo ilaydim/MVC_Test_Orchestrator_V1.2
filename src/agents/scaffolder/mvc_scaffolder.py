@@ -95,8 +95,7 @@ class MVCScaffolder:
         (self.scaffold_root / "controllers").mkdir(parents=True, exist_ok=True)
 
     def _safe_class_name(self, raw_name: str) -> str:
-        """
-        Normalizes a raw SRS / architecture name into a safe class/file name.
+        """Normalizes a raw SRS / architecture name into a safe class/file name.
 
         Examples:
         - "Homepage / Product Listing Screen" -> "HomepageProductListingScreen"

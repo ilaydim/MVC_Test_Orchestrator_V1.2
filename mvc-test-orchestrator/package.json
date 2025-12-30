@@ -2,8 +2,8 @@
   "name": "mvc-test-orchestrator",
   "displayName": "MVC Test Orchestrator V1.2",
   "description": "LLM-powered MVC architecture extractor and scaffolder.",
-  "version": "0.0.1",
-  "publisher": "your-name",
+  "version": "1.2.0",
+  "publisher": "ilayda-dim",
   "engines": {
     "vscode": "^1.80.0"
   },

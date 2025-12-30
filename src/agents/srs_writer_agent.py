@@ -9,16 +9,13 @@ class SRSWriterAgent(BaseArchitectAgent):
     """
 
     def __init__(self, rag_pipeline=None, llm_client=None):
-        super().__init__(rag_pipeline, llm_client) 
+        super().__init__(rag_pipeline, llm_client)
 
-    
     def generate_srs(self, user_idea: str) -> Path:
         """
         Instructs the LLM to generate the SRS document, saves the output to the data/ folder, 
         and returns the file path.
         """
-        import time
-        
         # Load prompt from external file
         prompt_path = Path(__file__).resolve().parents[2] / ".github" / "prompts" / "create_srs.prompt.md"
         prompt_template = prompt_path.read_text(encoding="utf-8")
@@ -26,14 +23,9 @@ class SRSWriterAgent(BaseArchitectAgent):
         prompt = prompt_template.replace("{{user_idea}}", user_idea)
         
         print("[SRS Writer] Generating SRS text...")
-        print(f"⏱️  Estimated time: ~15-30 seconds")
-        
-        start_time = time.time()
         
         try:
-            srs_text = self.llm.generate_content(prompt, stream=False)
-            elapsed = time.time() - start_time
-            print(f"✓ Generated in {elapsed:.1f}s") 
+            srs_text = self.llm.generate_content(prompt, stream=False) 
 
         except QuotaExceededError as qe:
             print(f"\n{str(qe)}")

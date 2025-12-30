@@ -34,10 +34,11 @@ class RecommendationFixerAgent(BaseArchitectAgent):
         print("[Recommendation Fixer] Starting automatic fixes...")
         print("="*60)
 
-        # Load audit report
+        # 1. Raporu bul ve yükle
         if audit_report_path is None:
             audit_report_path = self.data_dir / "final_audit_report.json"
         
+        # 2. Rapor yoksa işlemi durdur
         if not audit_report_path.exists():
             return {
                 "success": False,
@@ -54,8 +55,10 @@ class RecommendationFixerAgent(BaseArchitectAgent):
                 "error": f"Failed to read audit report: {e}",
                 "fixed_files": []
             }
-
+        
+        # 3. Raporun içindeki tavsiyeleri (recommendations) al
         recommendations = audit_report.get("recommendations", [])
+
         if not recommendations:
             print("[Recommendation Fixer] ✅ No recommendations to apply.")
             return {
@@ -77,7 +80,7 @@ class RecommendationFixerAgent(BaseArchitectAgent):
 
             print(f"[{idx}/{len(recommendations)}] Processing: {Path(file_path_str).name}")
 
-            try:
+            try:  
                 result = self._apply_single_recommendation(
                     file_path_str=file_path_str,
                     violation_type=violation_type,
@@ -142,7 +145,7 @@ class RecommendationFixerAgent(BaseArchitectAgent):
                 "error": f"Failed to read file: {e}"
             }
 
-        # Try targeted fix first (faster, more reliable)
+        # Eğer hata bir "Import" hatasıysa (MVC ihlali), bunu AST ile kesin olarak çöz
         if violation_type in ["MVC_M_V_VIOLATION", "MVC_M_C_VIOLATION", "MVC_V_M_VIOLATION"]:
             # Import removal violations - use AST-based fix
             result = self._fix_import_violation(
@@ -177,7 +180,7 @@ class RecommendationFixerAgent(BaseArchitectAgent):
         """
         try:
             # Extract import to remove from recommendation
-            # Pattern: "remove the import statement for X"
+            # Pattern: "remove the import statement for X (buradan X'i çıkaracağız)"
             import_patterns = [
                 r"remove.*?import.*?for\s+`([^`]+)`",  # `generated_src.views.ProductListingView`
                 r"remove.*?import.*?for\s+([a-zA-Z_][a-zA-Z0-9_\.]+)",  # generated_src.views.ProductListingView
@@ -274,6 +277,7 @@ class RecommendationFixerAgent(BaseArchitectAgent):
         except Exception as e:
             return {"success": False, "error": f"AST-based fix failed: {e}"}
 
+    #AST bir sebeple (kod bozuksa vb.) satırı bulamazsa, klasik metin arama-silme yöntemine başvurur
     def _fix_import_violation_string_based(
         self,
         original_code: str,
@@ -323,7 +327,8 @@ class RecommendationFixerAgent(BaseArchitectAgent):
             "success": True,
             "changes": [f"Removed import: {removed_line_content or import_to_remove}"]
         }
-
+    
+    #AST'nin çözemediği karmaşık durumlarda Gemini devreye girer.
     def _fix_with_llm(
         self,
         file_path: Path,

@@ -16,26 +16,21 @@ class ControllerArchitectAgent(BaseArchitectAgent):
     """
     
     def _load_analysis(self, filename: str) -> Dict[str, Any]:
-            """Loads structured JSON output from a previous agent."""
-            analysis_path = self.data_dir / filename
-            
-            # Dosya Var mı Kontrolü
-            if not analysis_path.exists():
-                raise FileNotFoundError(
-                    f"FATAL ERROR: ControllerAgent could not find dependency file: {filename}. "
-                    "Ensure preceding agent ran successfully and saved the file to /data."
-                )
-            
-            # JSON Formatı Kontrolü
-            try:
-                with open(analysis_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except json.JSONDecodeError as e:
-                # LLM'den gelen JSON'un bozuk olduğunu gösterir.
-                raise ValueError(
-                    f"FATAL ERROR: Could not decode JSON in {filename}. "
-                    f"LLM produced malformed JSON. Error: {e}"
-                )
+        """Loads structured JSON output from a previous agent."""
+        analysis_path = self.data_dir / filename
+        if not analysis_path.exists():
+            raise FileNotFoundError(
+                f"Required analysis file not found: {filename}. "
+                "Ensure preceding agents have run successfully."
+            )
+        try:
+            with open(analysis_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Could not decode JSON in {filename}. "
+                f"LLM produced malformed JSON. Error: {e}"
+            )
     # ----------------------------------------------------------------------
     # Main Entry Point
     # ----------------------------------------------------------------------
@@ -79,7 +74,6 @@ class ControllerArchitectAgent(BaseArchitectAgent):
         """
         Builds clean and minimal prompt for extracting CONTROLLER layer.
         """
-
         context = ""
         for i, c in enumerate(chunks):
             context += f"\n\n--- SRS Chunk {i+1} ---\n{c}\n"

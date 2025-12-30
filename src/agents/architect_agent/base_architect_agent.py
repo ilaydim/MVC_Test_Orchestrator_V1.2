@@ -80,8 +80,8 @@ class BaseArchitectAgent:
     def save_output(self, data: dict, filename: str):
         """
         Saves JSON outputs into the /data directory.
-        Every architect agent (model/view/controller/orchestrator)
-        can use this to persist results.
+        Every architect agent (model/view/controller/orchestrator) can use this to persist results.
+        Also creates a corresponding .md file.
         """
         self.data_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.data_dir / filename
@@ -90,7 +90,76 @@ class BaseArchitectAgent:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
 
+        # Also create a markdown file
+        if filename.endswith('.json'):
+            md_filename = filename.replace('.json', '.md')
+            md_path = self.data_dir / md_filename
+            md_content = self._json_to_markdown(data, filename)
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+
         return output_path
+    
+    def _json_to_markdown(self, data: dict, filename: str) -> str:
+        """
+        Converts JSON data to a readable markdown format.
+        """
+        lines = []
+        
+        # Add title based on filename
+        title = filename.replace('.json', '').replace('_', ' ').title()
+        lines.append(f"# {title}\n\n")
+        
+        # Helper function to recursively convert JSON to markdown
+        def process_value(key, value, level=0):
+            key_title = key.replace('_', ' ').title() if key else ""
+            
+            if isinstance(value, dict):
+                if key:
+                    lines.append(f"{'#' * (level + 2)} {key_title}\n\n")
+                for sub_key, sub_value in value.items():
+                    process_value(sub_key, sub_value, level + 1)
+                if key:
+                    lines.append("\n")
+                    
+            elif isinstance(value, list):
+                # Check if list contains only simple types (no dicts)
+                has_dicts = any(isinstance(item, dict) for item in value)
+                
+                if has_dicts:
+                    # List of objects - create header and process each object
+                    if key:
+                        lines.append(f"{'#' * (level + 2)} {key_title}\n\n")
+                    for idx, item in enumerate(value):
+                        if isinstance(item, dict):
+                            # For list of objects, create a subsection
+                            if 'name' in item:
+                                item_name = item.get('name', f'Item {idx + 1}')
+                                lines.append(f"{'#' * (level + 3)} {item_name}\n\n")
+                            else:
+                                lines.append(f"{'#' * (level + 3)} Item {idx + 1}\n\n")
+                            # Add all key-value pairs from the object
+                            for sub_key, sub_value in item.items():
+                                process_value(sub_key, sub_value, level + 1)
+                            lines.append("\n")
+                    if key:
+                        lines.append("\n")
+                else:
+                    # List of simple values - print as bullet points
+                    if key:
+                        lines.append(f"**{key_title}:**\n")
+                    for item in value:
+                        lines.append(f"- {item}\n")
+                    lines.append("\n")
+            else:
+                if value is not None and value != "":
+                    lines.append(f"- **{key_title}**: {value}\n")
+        
+        # Process top-level dictionary
+        for key, value in data.items():
+            process_value(key, value, level=0)
+        
+        return "".join(lines)
     
     # ----------------------------------------------------------------------
     # JSON Parsing Helper 

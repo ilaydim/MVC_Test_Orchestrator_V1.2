@@ -13,4 +13,5 @@ EMBEDDING_MODEL_NAME = "distiluse-base-multilingual-cased-v1"
 DEFAULT_CHUNK_SIZE = 1000       # characters
 DEFAULT_CHUNK_OVERLAP = 100     # characters
 
-DEFAULT_TOP_K = 5
+DEFAULT_TOP_K = 5               # Default RAG chunk count for targeted queries
+REQUIREMENTS_TOP_K = 10         # Higher chunk count for requirements analysis (entire document overview)

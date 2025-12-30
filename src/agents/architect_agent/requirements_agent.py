@@ -2,7 +2,7 @@ import json
 from typing import Dict, Any, List
 
 from src.agents.architect_agent.base_architect_agent import BaseArchitectAgent
-from src.core.config import DEFAULT_TOP_K 
+from src.core.config import DEFAULT_TOP_K, REQUIREMENTS_TOP_K
 
 
 class RequirementsAgent(BaseArchitectAgent):
@@ -15,25 +15,7 @@ class RequirementsAgent(BaseArchitectAgent):
     targeted RAG queries, mitigating information loss.
     """
 
-    def _get_json_schema_definition(self) -> Dict[str, Any]:
-        """Defines the structured output format expected from the LLM."""
-        return {
-            "project_name": "Short, single-word project identifier (e.g., ECommerce)",
-            "domain_entities": [
-                {
-                    "name": "Core Entity Name (e.g., User, Product, Order)",
-                    "purpose": "The primary role of the entity and data it represents (1 sentence)",
-                }
-            ],
-            "system_functions": [
-                {
-                    "name": "High-Level Function Name (e.g., placeOrder, loginUser)",
-                    "description": "The high-level business workflow performed by this function (1 sentence)",
-                }
-            ]
-        }
-        
-    def extract_analysis(self, k: int = DEFAULT_TOP_K) -> Dict[str, Any]:
+    def extract_analysis(self, k: int = REQUIREMENTS_TOP_K) -> Dict[str, Any]:
         """
         Extracts structured requirements by performing a general RAG query and 
         asking the LLM to structure the content.

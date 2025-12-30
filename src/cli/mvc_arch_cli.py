@@ -86,9 +86,9 @@ def _run_extraction_pipeline(
     rag_pipeline.index_srs(current_srs_path)
     
     print("PHASE 1-2: Extracting MVC Architecture (Extraction Only)...")
-    from src.core.config import DEFAULT_TOP_K
+    from src.core.config import DEFAULT_TOP_K, REQUIREMENTS_TOP_K
     
-    requirements_analysis = requirements_agent.extract_analysis(k=DEFAULT_TOP_K)
+    requirements_analysis = requirements_agent.extract_analysis(k=REQUIREMENTS_TOP_K)
     model_json = model_agent.extract_models(k=DEFAULT_TOP_K)
     controller_json = controller_agent.extract_controllers(k=DEFAULT_TOP_K)
     view_json = view_agent.extract_views(k=DEFAULT_TOP_K)
@@ -785,8 +785,26 @@ def cmd_run_fix(args: argparse.Namespace) -> None:
                 print(f"[ERROR] Audit report not found: {audit_report_path}")
                 sys.exit(1)
 
-        # 4) Apply recommendations
-        print("[INFO] Applying recommendations from audit report...")
+        # 4) Ask for user confirmation
+        print("\n" + "="*60)
+        print("⚠️  WARNING: This will modify files in generated_src/ directory")
+        print("="*60)
+        print("\nDo you want to proceed with applying fixes? (yes/no): ", end="", flush=True)
+        
+        try:
+            user_input = input().strip().lower()
+            if user_input not in ['yes', 'y']:
+                print("\n[INFO] Fix operation cancelled by user.")
+                sys.exit(0)
+        except KeyboardInterrupt:
+            print("\n\n[INFO] Fix operation cancelled by user (Ctrl+C).")
+            sys.exit(0)
+        except EOFError:
+            print("\n\n[INFO] Fix operation cancelled (EOF).")
+            sys.exit(0)
+        
+        # 5) Apply recommendations
+        print("\n[INFO] Applying recommendations from audit report...")
         result = fixer_agent.apply_recommendations(audit_report_path=audit_report_path)
         
         if result["success"]:

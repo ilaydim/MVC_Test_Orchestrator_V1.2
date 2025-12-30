@@ -842,6 +842,20 @@ print("ERROR: No PDF library installed. Install with: pip install pdfplumber PyP
                     }
                 }
                 else if (command === "fix") {
+                    stream.markdown(`**⚠️ Warning: This will modify files in \`generated_src/\` directory**\n\n`);
+                    
+                    const userChoice = await vscode.window.showWarningMessage(
+                        "Apply audit recommendations? This will modify files in generated_src/ directory.",
+                        { modal: true },
+                        "Yes, Apply Fixes",
+                        "Cancel"
+                    );
+                    
+                    if (userChoice !== "Yes, Apply Fixes") {
+                        stream.markdown(`❌ **Fix operation cancelled by user.**\n\n`);
+                        return {};
+                    }
+                    
                     stream.markdown(`**🔧 Applying audit recommendations...**\n\n`);
                     await runPythonCommand(workspaceRoot, "run-fix", "", "fix_result.txt");
                     stream.markdown(`✅ **Fix complete**. Check output for details.\n\n`);

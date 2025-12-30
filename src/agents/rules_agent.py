@@ -2,7 +2,8 @@ import ast
 import json
 from typing import Dict, List
 from pathlib import Path
-import re 
+import re
+
 
 class RulesAgent:
     """
@@ -31,8 +32,7 @@ class RulesAgent:
         # Save violations to violations.json (Structured Output)
         violations_output = {
             "violations": violations,
-            "total_count": len(violations),
-            "scan_timestamp": str(Path(__file__).stat().st_mtime) if Path(__file__).exists() else "unknown"
+            "total_count": len(violations)
         }
         
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -63,6 +63,7 @@ class RulesAgent:
         pattern_view_models = re.compile(r'from\s+.*\.models\.|import\s+.*\.models\.|from\s+.*models\.|import\s+.*models\.', re.IGNORECASE)
         pattern_controller_controllers = re.compile(r'from\s+.*\.controllers\.|import\s+.*\.controllers\.|from\s+\..*Controller|import\s+.*Controller', re.IGNORECASE)
         
+        # Her dosyayı tek tek açar ve yoluna (path) bakar. Eğer dosya models klasöründeyse, ona "Sen bir Modelsin" damgasını vurur.
         for file_path in python_files:
             try:
                 content = file_path.read_text(encoding="utf-8")
