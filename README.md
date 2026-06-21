@@ -4,7 +4,7 @@
 
 MVC Test Orchestrator automatically extracts an MVC (Model–View–Controller) architecture from Software Requirements Specification (SRS) documents and generates Python code using a Retrieval-Augmented Generation (RAG)–based multi-agent AI system.
 
-This project is designed as an advanced **CLI-driven research and learning tool** for understanding MVC architecture, AI agents, and RAG-based code generation workflows.
+This project demonstrates an AI-driven architecture extraction and code generation pipeline that combines RAG, multi-agent orchestration, and static-analysis-based validation. The approach was published as a peer-reviewed paper at IISEC 2026 (see [Publication](#-publication) below).
 
 ---
 
@@ -15,12 +15,12 @@ This project is designed as an advanced **CLI-driven research and learning tool*
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
 - [Usage](#-usage)
-- [Architecture and Flow](#-architecture-and-flow)
+- [Architecture and Flow](#️-architecture-and-flow)
 - [Agents](#-agents)
-- [Project Structure](#-file-structure)
 - [Command Reference](#-command-reference)
 - [Documentation](#-documentation)
 - [Best Practices](#-best-practices)
+- [Publication](#-publication)
 - [Contributors](#-contributors)
 - [License](#-license)
 - [Acknowledgements](#-thank-you)
@@ -31,88 +31,89 @@ This project is designed as an advanced **CLI-driven research and learning tool*
 
 ### 🔧 Core Capabilities
 
-- ✅ **Automatic SRS Generation** from a user-provided project idea  
-- ✅ **RAG-Based Architecture Extraction** (Requirements, Models, Controllers, Views)  
-- ✅ **MVC Scaffold Generation** (empty Python class skeletons)  
-- ✅ **AI-Based Code Generation** for each MVC layer  
-- ✅ **Architecture Compliance Audit** using AST-based rules  
-- ✅ **Automatic Fixing** based on audit recommendations  
-- ✅ **Automatic Markdown Documentation** for all generated JSON outputs  
+- ✅ **Automatic SRS Generation** from a user-provided project idea
+- ✅ **RAG-Based Architecture Extraction** (Requirements, Models, Controllers, Views)
+- ✅ **MVC Scaffold Generation** (empty Python class skeletons)
+- ✅ **AI-Based Code Generation** for each MVC layer
+- ✅ **Architecture Compliance Audit** using AST-based rules
+- ✅ **Automatic Fixing** based on audit recommendations
+- ✅ **Automatic Markdown Documentation** for all generated JSON outputs
 
 ### 🤖 AI Agent System (Overview)
 
-- **SRS Writer Agent** – Generates an SRS document from a project idea  
-- **Requirements Agent** – Extracts domain entities and system functions  
-- **Model / Controller / View Agents** – Build MVC architecture layers  
-- **MVC Scaffolder** – Generates rule-based empty class files  
-- **Rules Agent** – Detects MVC violations using AST analysis  
-- **Reviewer Agent** – Converts violations into human-readable reports  
-- **Fixer Agent** – Applies recommended fixes automatically  
+- **SRS Writer Agent** – Generates an SRS document from a project idea
+- **Requirements Agent** – Extracts domain entities and system functions
+- **Model / Controller / View Agents** – Build MVC architecture layers
+- **MVC Scaffolder** – Generates rule-based empty class files
+- **Rules Agent** – Detects MVC violations using AST analysis
+- **Reviewer Agent** – Converts violations into human-readable reports
+- **Fixer Agent** – Applies recommended fixes automatically
 
 ---
 
 ## 💻 System Requirements
 
-- **Python**: 3.9 or higher  
-- **VS Code**: 1.80+ (optional – CLI usage is supported)  
-- **Google Gemini API Key** (free):  
-  https://makersuite.google.com/app/apikey  
-- **Disk Space**: ~500 MB  
+- **Python**: 3.9 or higher
+- **VS Code**: 1.80+ (optional – CLI usage is supported)
+- **Google Gemini API Key** (free): <https://makersuite.google.com/app/apikey>
+- **Disk Space**: ~500 MB
 
 ---
 
 ## 🚀 Installation
-This section describes the available installation methods for **MVC Test Orchestrator**.  Manual installation is provided for advanced users and research purposes.
 
 #### 1. Download the VSIX Package
 
-1. Go to the GitHub Releases page:
-   https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2/releases
+1. Go to the GitHub Releases page: <https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2/releases>
 2. Open the latest release (**v1.2.0**)
-3. Download the file: mvc-test-orchestrator-1.2.0.vsix
-* Download Location : The VSIX file is available under: GitHub → Releases → v1.2.0 → Assets
+3. Download the file: `mvc-test-orchestrator-1.2.0.vsix`
 
 #### 2. Install in VS Code
 
 1. Open **Visual Studio Code**
 2. Go to the **Extensions** view
 3. Click the **three dots (⋯)** menu
-4. Select **“Install from VSIX…”**
+4. Select **"Install from VSIX…"**
 5. Choose the downloaded `.vsix` file
 6. Restart VS Code if prompted
 
 ### 3. Clone the Repository
 
-```bash
+```
 git clone https://github.com/ilaydim/MVC_Test_Orchestrator_V1.2.git
 cd MVC_Test_Orchestrator_V1.2
 ```
 
 ### 4. Create and Activate a Virtual Environment
-```bash
+
+```
 python -m venv .venv
 
 Linux / macOS : source .venv/bin/activate
 Windows : .venv\Scripts\activate
 ```
 
-## 5. Install Dependencies
+### 5. Install Dependencies
 
-```bash
+```
 pip install -r requirements.txt
 ```
 
-## 6. Configure the API Key
-Create a .env file in the project root directory and add your Google Gemini API key. 
-```env
+### 6. Configure the API Key
+
+Create a `.env` file in the project root directory and add your Google Gemini API key.
+
+```
 GOOGLE_API_KEY=your_api_key_here
 ```
-### Set API Key
-**How to obtain an API key?:**
-1. [Google AI Studio] Visit https://makersuite.google.com/app/apikey
+
+**How to obtain an API key:**
+
+1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Sign in with your Google account
 3. Click Create API Key
-4. Copy the generated key and paste it into the .env file
+4. Copy the generated key and paste it into the `.env` file
+
 ---
 
 ## 🎯 Quick Start
@@ -121,7 +122,7 @@ GOOGLE_API_KEY=your_api_key_here
 
 Using `@mvc` in VS Code Copilot Chat:
 
-```bash
+```
 @mvc /create-srs "Write your idea."
 @mvc /extract
 @mvc /scaffold
@@ -131,14 +132,14 @@ Using `@mvc` in VS Code Copilot Chat:
 
 ### Usage with CLI
 
-```bash
-#1. Create SRS
+```
+# 1. Create SRS
 python -m src.cli.mvc_arch_cli create-srs --user-idea "Simple blog with posts and comments" --output data/srs_document.txt
 
-#2. Extract the architecture
+# 2. Extract the architecture
 python -m src.cli.mvc_arch_cli extract --srs-path data/srs_document.txt --output data/architecture_map.json
 
-#3. Create scaffold
+# 3. Create scaffold
 python -m src.cli.mvc_arch_cli scaffold --arch-path data/architecture_map.json
 
 # 4. Generate code (category based)
@@ -146,10 +147,10 @@ python -m src.cli.mvc_arch_cli generate-code --category model --arch-path data/a
 python -m src.cli.mvc_arch_cli generate-code --category controller --arch-path data/architecture_map.json
 python -m src.cli.mvc_arch_cli generate-code --category view --arch-path data/architecture_map.json
 
-#5. Quality inspection
+# 5. Quality inspection
 python -m src.cli.mvc_arch_cli audit --arch-path data/architecture_map.json
 
-#6. Autocorrect (optional)
+# 6. Autocorrect (optional)
 python -m src.cli.mvc_arch_cli run-fix --audit-report data/final_audit_report.json
 ```
 
@@ -162,22 +163,22 @@ python -m src.cli.mvc_arch_cli run-fix --audit-report data/final_audit_report.js
 #### 1. Creating or Uploading an SRS
 
 **Option A: Create a New SRS**
-```bash
+```
 @mvc /create-srs "Task manager for students with categories and deadlines"
 ```
 
 **Option B: Use an Existing SRS**
-```bash
+```
 # Place your SRS file in the data/ folder, then use the extract command
 ```
 
 #### 2. Extracting Architecture
 
-```bash
+```
 @mvc /extract
 ```
 
-This command does the following:
+This command:
 - Indexes the SRS to the RAG pipeline
 - Extracts domain entities and functions with the Requirements Agent
 - Extracts the architecture with Model, Controller, and View Agents
@@ -185,47 +186,33 @@ This command does the following:
 
 #### 3. Creating a Scaffold
 
-```bash
+```
 @mvc /scaffold
 ```
 
-Creates empty Python class files:
-- `scaffolds/mvc_skeleton/models/*.py`
-- `scaffolds/mvc_skeleton/views/*.py`
-
-- `scaffolds/mvc_skeleton/controllers/*.py`
+Creates empty Python class files under `scaffolds/mvc_skeleton/{models,views,controllers}/*.py`
 
 #### 4. Code Generation
 
-Category-based code generation (it is recommended to do this sequentially):
-
-```bash
+```
 @mvc /generate_code --category model
 @mvc /generate_code --category controller
 @mvc /generate_code --category view
 ```
 
-For each category:
-- Reads scaffold files
-- Gets relevant information from the architecture map
-- Pulls the SRS context with RAG
-- Generates the actual code with LLM
-- Writes to `generated_src/{category}s/*.py`
+For each category: reads scaffold files, pulls relevant architecture-map and SRS context via RAG, generates code with an LLM, and writes to `generated_src/{category}s/*.py`.
 
 #### 5. Quality Audit
 
-```bash
+```
 @mvc /audit
 ```
 
-- Scans files in the `generated_src/` folder
-- Checks compliance with MVC rules
-- Detects and reports violations
-- Generates `final_audit_report.json`
+Scans `generated_src/`, checks MVC-rule compliance, detects violations, and generates `final_audit_report.json`.
 
 #### 6. Automatic Fix (Optional)
 
-```bash
+```
 @mvc /fix
 ```
 
@@ -234,8 +221,6 @@ Automatically applies the recommendations in the audit report.
 ---
 
 ## 🏗️ Architecture and Flow
-
-### General Flow Diagram
 
 ```
 User Idea / SRS
@@ -264,6 +249,7 @@ architecture_map.json + .md (merged)
     ↓
 [Fixer Agent] → Corrected code (optional)
 ```
+
 ---
 
 ## 🤖 Agents
@@ -289,27 +275,19 @@ architecture_map.json + .md (merged)
 ### Controller Architect Agent
 - **Task**: Creates the controller architecture from functions
 - **Dependency**: Requirements + Model outputs
-
 - **Output**: `controller_architecture.json`
-
 - **LLM Usage**: ✅
 
 ### View Architect Agent
-
 - **Task**: Defines UI screens and components
 - **Dependency**: Model + Controller outputs
-
 - **Output**: `view_architecture.json`
-
 - **LLM Usage**: ✅
 
 ### MVC Scaffolder
-
 - **Task**: Creates empty Python class files
 - **Usage**: `scaffold` command
-
 - **Output**: `scaffolds/mvc_skeleton/*.py`
-
 - **LLM Usage**: ❌ (Rule-based)
 
 ### Rules Agent
@@ -328,6 +306,7 @@ architecture_map.json + .md (merged)
 - **Task**: Automatically applies audit recommendations
 - **Usage**: `run-fix` command
 - **LLM Usage**: ✅ (fallback, AST-based primary)
+
 ---
 
 ## 📝 Command Reference
@@ -335,7 +314,7 @@ architecture_map.json + .md (merged)
 ### VS Code Commands (Copilot Chat)
 
 | Command | Description | Parameters |
-|-------|----------|--------------|
+| --- | --- | --- |
 | `@mvc /create-srs <idea>` | Create SRS | `idea`: Project idea |
 | `@mvc /extract` | Extract architecture | - |
 | `@mvc /scaffold` | Create scaffold | - |
@@ -346,27 +325,27 @@ architecture_map.json + .md (merged)
 ### CLI Commands
 
 #### create-srs
-```bash
+```
 python -m src.cli.mvc_arch_cli create-srs \
     --user-idea "Your project idea" \
     --output data/srs_document.txt
 ```
 
 #### extract
-```bash
+```
 python -m src.cli.mvc_arch_cli extract \
     --srs-path data/srs_document.txt \
     --output data/architecture_map.json
 ```
 
 #### scaffold
-```bash
+```
 python -m src.cli.mvc_arch_cli scaffold \
     --arch-path data/architecture_map.json
 ```
 
 #### generate-code
-```bash
+```
 python -m src.cli.mvc_arch_cli generate-code \
     --category model \
     --arch-path data/architecture_map.json
@@ -381,13 +360,13 @@ python -m src.cli.mvc_arch_cli generate-code \
 ```
 
 #### audit
-```bash
+```
 python -m src.cli.mvc_arch_cli audit \
     --arch-path data/architecture_map.json
 ```
 
 #### run-fix
-```bash
+```
 python -m src.cli.mvc_arch_cli run-fix \
     --audit-report data/final_audit_report.json
 ```
@@ -396,23 +375,17 @@ python -m src.cli.mvc_arch_cli run-fix \
 
 ## 📚 Documentation
 
-### Additional Documentation
-
 - **Prompt Templates**: Editable prompts in the `.github/prompts/` folder
-
 - **Source Code**: Docstrings and type hints are available for each agent
 
-### Learning Resources
+### Key Concepts Demonstrated
 
-This project is for educational purposes and helps implement:
+This project demonstrates the implementation of:
 - MVC (Model-View-Controller) architecture
 - RAG (Retrieval-Augmented Generation) systems
-- AI Agent architectures
-
+- AI agent architectures
 - Prompt engineering
-
 - Python AST parsing
-
 - ChromaDB vector database usage
 
 ---
@@ -448,37 +421,40 @@ This project is for educational purposes and helps implement:
 - **Models**: Maximum 8-10 models recommended
 - **Controllers**: Maximum 6-8 controllers
 - **Views**: Maximum 6-8 views
-- **Lines Per File**: 20-50 lines (ideal for learning)
+- **Lines Per File**: 20-50 lines (ideal for readability)
+
+---
+
+## 📄 Publication
+
+**MVC Test Orchestrator: SRS-Driven Architecture Extraction** — IISEC 2026 (5th International Informatics and Software Engineering Conference).
+İ. Dim, Y. Saklavcı, K. Aytekin, M. Karakaya. [IEEE Xplore](https://ieeexplore.ieee.org/document/11418519)
 
 ---
 
 ## 👥 Contributors
 
-This project was developed as part of an academic research and learning effort.
-
-### Core Contributors
 - **İlayda Dim**
 - **Kaan Aytekin**
-- **Yaren Saklavcı** 
+- **Yaren Saklavcı**
 
-### Instructor
-- **Murat Karakaya**
+**Academic Advisor / Co-author:** Murat Karakaya
 
 ### Project Context
 
-MVC Test Orchestrator was designed as a research-oriented tool to explore:
+MVC Test Orchestrator explores:
 - AI-assisted software architecture extraction
 - Retrieval-Augmented Generation (RAG) pipelines
 - Multi-agent LLM-based systems
 - Automated code generation and validation workflows
 
-Contributions, suggestions, and academic feedback are welcome.
+Contributions, suggestions, and feedback are welcome.
 
 ---
 
 ## 📄 License
 
-This project is for educational purposes.
+[Add a license, e.g., MIT — see note below]
 
 ---
 
@@ -487,5 +463,3 @@ This project is for educational purposes.
 - **Google Gemini API**: For LLM support
 - **ChromaDB**: For vector database
 - **Sentence Transformers**: For embedding models
-
----
